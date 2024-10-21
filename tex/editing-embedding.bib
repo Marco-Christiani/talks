@@ -1,0 +1,72 @@
+@article{bolukbasi2016man,
+  title={Man is to Computer Programmer as Woman is to Homemaker? {D}ebiasing word embeddings},
+  author={Bolukbasi, Tolga and Chang, Kai-Wei and Zou, James Y. and Saligrama, Venkatesh and Kalai, Adam T.},
+  journal={Advances in {N}eural {I}nformation {P}rocessing {S}ystems},
+  volume={29},
+  pages={4349--4357},
+  year={2016},
+  url={https://proceedings.neurips.cc/paper/2016/file/a486cd07e4ac3d270571622f4f316ec5-Paper.pdf}
+}
+@inproceedings{gonen-goldberg-2019-lipstick,
+    title = "Lipstick on a Pig: {D}ebiasing Methods Cover up Systematic Gender Biases in Word Embeddings But do not Remove Them",
+    author = "Gonen, Hila  and
+      Goldberg, Yoav",
+    editor = "Burstein, Jill  and
+      Doran, Christy  and
+      Solorio, Thamar",
+    booktitle = "Proceedings of the 2019 Conference of the North {A}merican Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)",
+    month = jun,
+    year = "2019",
+    address = "Minneapolis, Minnesota",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/N19-1061",
+    doi = "10.18653/v1/N19-1061",
+    pages = "609--614",
+    abstract = "Word embeddings are widely used in NLP for a vast range of tasks. It was shown that word embeddings derived from text corpora reflect gender biases in society. This phenomenon is pervasive and consistent across different word embedding models, causing serious concern. Several recent works tackle this problem, and propose methods for significantly reducing this gender bias in word embeddings, demonstrating convincing results. However, we argue that this removal is superficial. While the bias is indeed substantially reduced according to the provided bias definition, the actual effect is mostly hiding the bias, not removing it. The gender bias information is still reflected in the distances between {``}gender-neutralized{''} words in the debiased embeddings, and can be recovered from them. We present a series of experiments to support this claim, for two debiasing methods. We conclude that existing bias removal techniques are insufficient, and should not be trusted for providing gender-neutral modeling.",
+}
+
+@InProceedings{pmlr-v162-ravfogel22a,
+  title = 	 {Linear Adversarial Concept Erasure},
+  author =       {Ravfogel, Shauli and Twiton, Michael and Goldberg, Yoav and Cotterell, Ryan D},
+  booktitle = 	 {Proceedings of the 39th International Conference on Machine Learning},
+  pages = 	 {18400--18421},
+  year = 	 {2022},
+  editor = 	 {Chaudhuri, Kamalika and Jegelka, Stefanie and Song, Le and Szepesvari, Csaba and Niu, Gang and Sabato, Sivan},
+  volume = 	 {162},
+  series = 	 {Proceedings of Machine Learning Research},
+  month = 	 {17--23 Jul},
+  publisher =    {PMLR},
+  pdf = 	 {https://proceedings.mlr.press/v162/ravfogel22a/ravfogel22a.pdf},
+  url = 	 {https://proceedings.mlr.press/v162/ravfogel22a.html},
+  abstract = 	 {Modern neural models trained on textual data rely on pre-trained representations that emerge without direct supervision. As these representations are increasingly being used in real-world applications, the inability to <em>control</em> their content becomes an increasingly important problem. In this work, we formulate the problem of identifying a linear subspace that corresponds to a given concept, and removing it from the representation. We formulate this problem as a constrained, linear minimax game, and show that existing solutions are generally not optimal for this task. We derive a closed-form solution for certain objectives, and propose a convex relaxation that works well for others. When evaluated in the context of binary gender removal, the method recovers a low-dimensional subspace whose removal mitigates bias by intrinsic and extrinsic evaluation. Surprisingly, we show that the method—despite being linear—is highly expressive, effectively mitigating bias in the output layers of deep, nonlinear classifiers while maintaining tractability and interpretability.}
+}
+@inproceedings{ravfogel-etal-2020-null,
+    title = "Null It Out: Guarding Protected Attributes by Iterative Nullspace Projection",
+    author = "Ravfogel, Shauli  and
+      Elazar, Yanai  and
+      Gonen, Hila  and
+      Twiton, Michael  and
+      Goldberg, Yoav",
+    editor = "Jurafsky, Dan  and
+      Chai, Joyce  and
+      Schluter, Natalie  and
+      Tetreault, Joel",
+    booktitle = "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics",
+    month = jul,
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2020.acl-main.647",
+    doi = "10.18653/v1/2020.acl-main.647",
+    pages = "7237--7256",
+    abstract = "The ability to control for the kinds of information encoded in neural representation has a variety of use cases, especially in light of the challenge of interpreting these models. We present Iterative Null-space Projection (INLP), a novel method for removing information from neural representations. Our method is based on repeated training of linear classifiers that predict a certain property we aim to remove, followed by projection of the representations on their null-space. By doing so, the classifiers become oblivious to that target property, making it hard to linearly separate the data according to it. While applicable for multiple uses, we evaluate our method on bias and fairness use-cases, and show that our method is able to mitigate bias in word embeddings, as well as to increase fairness in a setting of multi-class classification.",
+}
+@misc{belrose2023leaceperfectlinearconcept,
+      title={LEACE: Perfect linear concept erasure in closed form}, 
+      author={Nora Belrose and David Schneider-Joseph and Shauli Ravfogel and Ryan Cotterell and Edward Raff and Stella Biderman},
+      year={2023},
+      eprint={2306.03819},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2306.03819}, 
+}
