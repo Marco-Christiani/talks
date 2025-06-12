@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -21,7 +22,6 @@ import (
 var logger *slog.Logger
 
 func init() {
-	// Set up structured logging with levels
 	level := slog.LevelInfo
 	if os.Getenv("DEBUG") == "1" {
 		level = slog.LevelDebug
@@ -52,7 +52,7 @@ type ResizeMessage struct {
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow all origins for development - restrict in production
+		// HACK: CORS
 		return true
 	},
 }
@@ -124,7 +124,7 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Start a shell process with PTY
+	// Start with a regular bash shell first
 	cmd := exec.Command("/bin/bash")
 	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
@@ -145,6 +145,21 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger.Debug("Terminal session started", "pid", cmd.Process.Pid)
 
+	// Send welcome message and wait for user to press enter
+	welcomeMsg := `Welcome to the interactive terminal!
+
+This terminal supports multiple tabs and split panes using tmux.
+Press Enter to start tmux, or type commands directly in bash.
+
+`
+	conn.WriteJSON(TerminalMessage{
+		Type: "output",
+		Data: welcomeMsg,
+	})
+
+	// Track if we've started tmux yet
+	tmuxStarted := false
+
 	// Handle WebSocket messages
 	go func() {
 		defer cmd.Process.Kill()
@@ -158,8 +173,51 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 			switch msg.Type {
 			case "input":
 				if data, ok := msg.Data.(string); ok {
-					ptmx.Write([]byte(data))
+					// Check if this is the first enter press to start tmux
+					if !tmuxStarted && data == "\r" {
+						tmuxStarted = true
+						logger.Debug("Starting tmux session")
+
+						// Clear the line and start tmux
+						ptmx.Write([]byte("\r\033[K"))
+
+						// Check if session exists and attach or create
+						checkCmd := exec.Command("tmux", "has-session", "-t", "default")
+						if checkCmd.Run() == nil {
+							ptmx.Write([]byte("tmux attach -t default\r"))
+						} else {
+							ptmx.Write([]byte("tmux new-session -s default\r"))
+						}
+					} else {
+						ptmx.Write([]byte(data))
+					}
 				}
+			case "tmux":
+				// Handle tmux commands from UI buttons
+				if tmuxStarted {
+					if data, ok := msg.Data.(string); ok {
+						// Send Ctrl+B prefix followed by the command key
+						ptmx.Write([]byte("\x02" + data))
+					}
+				}
+
+			case "tmux_command":
+				if data, ok := msg.Data.(string); ok && tmuxStarted {
+					args := strings.Fields(data)
+
+					cmd := exec.Command("tmux", args...)
+					cmd.Stdin = nil
+					cmd.Stdout = nil
+					cmd.Stderr = nil
+					if err := cmd.Run(); err != nil {
+						logger.Error("Failed to run tmux command", "cmd", data, "error", err)
+						conn.WriteJSON(TerminalMessage{
+							Type: "error",
+							Data: fmt.Sprintf("tmux command failed: %v", err),
+						})
+					}
+				}
+
 			case "resize":
 				if resizeData, ok := msg.Data.(map[string]interface{}); ok {
 					cols, colsOk := resizeData["cols"].(float64)
@@ -192,7 +250,7 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logger.Debug("Terminal session ended")
+	logger.Debug("Tmux terminal session ended")
 }
 
 func setWinsize(ptmx *os.File, cols, rows int) {

@@ -21,6 +21,7 @@ const isConnected = ref(false);
 const isConnecting = ref(false);
 const connectionError = ref("");
 const fontSize = ref(14);
+const showHelp = ref(false);
 
 let terminal: Terminal;
 let fitAddon: FitAddon;
@@ -281,6 +282,42 @@ function updateFontSize() {
     }, 100);
   }
 }
+
+function tmuxCommand(keySequence) {
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    // First send the Ctrl+B prefix
+    websocket.send(
+      JSON.stringify({
+        type: "input",
+        data: "\x02",
+      }),
+    );
+
+    // Then send each character separately
+    for (const ch of keySequence) {
+      // Delay
+      setTimeout(() => {
+        fitAddon.fit();
+      }, 100);
+
+      websocket.send(
+        JSON.stringify({
+          type: "input",
+          data: ch,
+        }),
+      );
+    }
+  }
+}
+
+function sendTmuxCommand(command) {
+  websocket.send(
+    JSON.stringify({
+      type: "tmux_command",
+      data: command, // e.g. "split-window -h"
+    }),
+  );
+}
 </script>
 
 <template>
@@ -302,6 +339,69 @@ function updateFontSize() {
         <span class="text-sm font-mono">
           {{ session ? `${session.id}:${session.port}` : "No session" }}
         </span>
+
+        <!-- Window Controls -->
+        <div class="tmux-controls flex gap-2 ml-4">
+          <button
+            @click="tmuxCommand('c')"
+            class="px-1 py-1 text-xs bg-green-600 rounded hover:bg-green-500"
+            title="New Window (Ctrl+b, c)"
+          >
+            <MdiAdd />
+          </button>
+          <button
+            @click="tmuxCommand('p')"
+            class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+            title="Previous Window (Ctrl+b, p)"
+          >
+            <MdiArrowLeft />
+          </button>
+          <button
+            @click="tmuxCommand('n')"
+            class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+            title="Next Window (Ctrl+b, n)"
+          >
+            <MdiArrowRight />
+          </button>
+
+          <!-- Pane controls -->
+          <button
+            @click="tmuxCommand('o')"
+            class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-orange-500"
+            title="Switch Pane (Ctrl+b, o)"
+          >
+            <MdiWindowRestore />
+            <!-- <MdiAlignVerticalDistribute /> -->
+            <!-- <MdiDragVerticalVariant /> -->
+          </button>
+          <button
+            @click="tmuxCommand('%')"
+            class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
+            title="Split Vertical (Ctrl+b, %)"
+          >
+            <MdiAlignHorizontalDistribute />
+          </button>
+          <!-- <button @click="tmuxCommand('\"')"
+                  class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
+                  title="Split Horizontal (Ctrl+b, \")">
+            ⬒
+          </button> -->
+
+          <!-- Close pane -->
+          <!-- <button
+            @click="tmuxCommand('xy\r')"
+            class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500"
+            title="Close Pane (Ctrl+b, x)"
+          >
+            <MdiClose />
+          </button> -->
+          <!-- <button onclick='sendTmuxCommand("split-window -h")'>
+            Split Horizontally
+          </button> -->
+          <button @click="sendTmuxCommand('kill-pane')">
+            <MdiClose />
+          </button>
+        </div>
       </div>
       <div class="flex gap-2">
         <div class="flex items-center gap-1">
@@ -311,7 +411,7 @@ function updateFontSize() {
             class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
             title="Decrease font size"
           >
-            A-
+            -
           </button>
           <span class="text-xs px-1">{{ fontSize }}px</span>
           <button
@@ -320,7 +420,7 @@ function updateFontSize() {
             class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
             title="Increase font size"
           >
-            A+
+            +
           </button>
         </div>
         <button
@@ -358,6 +458,34 @@ function updateFontSize() {
     >
       Creating new Docker session...
     </div>
+
+    <button
+      @click="showHelp = true"
+      class="mt-2 px-1 py-1 text-sm bg-blue-600 rounded hover:blue-500"
+    >
+      Help
+    </button>
+    <!-- <div
+      v-if="showHelp"
+      class="help-overlay absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 text-black"
+    >
+      <div class="bg-white p-6 rounded-lg max-w-md">
+        <h3 class="font-bold mb-4">Terminal Shortcuts</h3>
+        <div class="space-y-2 text-md">
+          <div><kbd>Ctrl+T</kbd> - New tab</div>
+          <div><kbd>Ctrl+PageUp/PageDown</kbd> - Switch tabs</div>
+          <div><kbd>Ctrl+Alt+→</kbd> - Split right</div>
+          <div><kbd>Ctrl+Alt+↓</kbd> - Split down</div>
+          <div><kbd>Ctrl+W</kbd> - Close current pane/tab</div>
+        </div>
+        <button
+          @click="showHelp = false"
+          class="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+        >
+          Got it!
+        </button>
+      </div>
+    </div> -->
   </div>
 </template>
 
