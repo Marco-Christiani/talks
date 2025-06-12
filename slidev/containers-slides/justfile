@@ -12,7 +12,7 @@ dind-server:
 dind-test:
     sess_json=$(curl -X POST http://localhost:5000/session \
         -H "Content-Type: application/json" \
-        -d '{"wait": "true", "timeout": "30"}')
+        -d '{"wait": "true", "timeout": "15"}')
     sess_id=$(echo "$sess_json" | jq -r ".id")
     sess_port=$(echo "$sess_json" | jq -r ".port")
     echo "Started Session: ID=$sess_id Port: $sess_port"
@@ -22,4 +22,5 @@ dind-test:
     curl -X POST $endpoint \
     -H "Content-Type: application/json" \
     -d '{"cmd": "docker run hello-world", "debug": "false"}'
+    docker logs -f $sess_id
     curl -X DELETE http://localhost:5000/session?sess=$sess_id

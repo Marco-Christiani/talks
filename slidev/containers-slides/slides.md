@@ -37,6 +37,11 @@ print("Hello from Python")
 
 ---
 
+<!-- <Terminal :sessionId="mySession.id" :sessionPort="mySession.port" /> -->
+<Terminal />
+
+---
+
 <RunButton cmd="docker run hello-world" />
 
 ---

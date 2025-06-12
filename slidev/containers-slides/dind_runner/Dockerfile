@@ -1,10 +1,11 @@
 # dind_runner/Dockerfile
 FROM docker:dind
 
-RUN apk add --no-cache go bash tini
+RUN apk add --no-cache go bash tini curl
 
-COPY main.go /app/main.go
+RUN mkdir /app
 WORKDIR /app
+COPY main.go go.mod go.sum /app/
 
 RUN go build -o runner main.go
 
@@ -26,5 +27,5 @@ exec /app/runner
 EOF
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=3 \
-    CMD (docker info > /dev/null && curl -f http://localhost:8000/health) || exit 1
+    CMD (docker info > /dev/null && curl -f http://127.0.0.1:8000/health) || exit 1
 ENTRYPOINT ["/sbin/tini", "--", "/app/start.sh"]

@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass
 from typing import ClassVar, Dict
 
 import requests
-from flask import Flask, jsonify, request
+from flask import Flask, current_app, jsonify, request
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -92,15 +92,32 @@ class State:
                     host_port = int(binding[0]["HostPort"])
                     results[container_name] = Session(id=container_name, port=host_port)
                     break
+        current_session_ids = set(results.keys())
+        known_session_ids = set(cls._sessions.keys())
 
-        for container_name, session in itertools.chain(results.items(), cls._sessions.copy().items()):
-            if container_name not in cls._sessions:
-                assert container_name == session.id
-                print("Found session:", session)
-                cls._sessions[container_name] = session
-            elif container_name not in results:
-                print("Session gone:", session)
-                del cls._sessions[container_name]
+        new_session_ids = current_session_ids - known_session_ids
+        gone_session_ids = known_session_ids - current_session_ids
+
+        for container_name in new_session_ids:
+            session = results[container_name]
+            print("NEW:", session)
+
+        for container_name in gone_session_ids:
+            session = cls._sessions[container_name]
+            print("GONE:", session)
+
+        cls._sessions = results
+
+        # all_sessions = {** results, **known_sessions}
+
+        # for container_name, session in all_sessions.items():
+        #     if container_name not in known_sessions:
+        #         assert container_name == session.id
+        #         print("Found session:", session)
+        #         cls._sessions[container_name] = session
+        #     elif container_name in known_sessions and container_name in cls._sessions:
+        #         print("Session gone:", session)
+        #         del cls._sessions[container_name]
 
 
 @app.route("/session", methods=["GET"])
