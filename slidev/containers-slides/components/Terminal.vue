@@ -1,22 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
+  import { BACKEND_URL, getSession, SESSION_KEY, useSession } from '@lib/session';
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 
-const props = defineProps<{
-  sessionId?: string;
-  sessionPort?: number;
-}>();
-
-type Session = {
-  id: string;
-  port: number;
-};
-
 const terminalContainer = ref<HTMLElement>();
-const session = ref<Session | null>(null);
+const session = useSession();
 const isConnected = ref(false);
 const isConnecting = ref(false);
 const connectionError = ref("");
@@ -26,14 +17,49 @@ const showHelp = ref(false);
 let terminal: Terminal;
 let fitAddon: FitAddon;
 let websocket: WebSocket | null = null;
-let resizeObserver: ResizeObserver | null = null;
 
-const SESSION_KEY = "docker-session";
 
 onMounted(async () => {
   await initializeSession();
-  await initializeTerminal();
+  observeTerminalVisibility();
 });
+
+
+function observeTerminalVisibility() {
+  if (!terminalContainer.value) return;
+
+  const observer = new IntersectionObserver(async ([entry]) => {
+    if (entry.isIntersecting) {
+      if (!terminal) {
+        await initializeTerminal(); // safe to call once
+      } else {
+        setTimeout(refitTerminal, 50); // DOM might have resized
+      }
+    }
+  }, {
+    root: null, // default to viewport
+    threshold: 0.1,
+  });
+
+  observer.observe(terminalContainer.value);
+  onUnmounted(() => observer.disconnect());
+}
+
+function refitTerminal() {
+  if (!terminal || !fitAddon) return;
+
+  fitAddon.fit();
+
+  const { cols, rows } = terminal;
+  if (cols > 2 && rows > 1 && websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.send(
+      JSON.stringify({
+        type: "resize",
+        data: { cols, rows },
+      }),
+    );
+  }
+}
 
 onUnmounted(() => {
   cleanup();
@@ -48,61 +74,23 @@ function cleanup() {
 }
 
 async function initializeSession() {
-  // If session info is provided via props, use it
-  if (props.sessionId && props.sessionPort) {
-    session.value = { id: props.sessionId, port: props.sessionPort };
-    return;
-  }
-
-  // Otherwise, try to restore from localStorage or create new
-  const saved = localStorage.getItem(SESSION_KEY);
-  if (saved) {
-    try {
-      const parsed: Session = JSON.parse(saved);
-      const check = await fetch(
-        `http://localhost:5000/session?sess=${parsed.id}`,
-      );
-      if (check.ok) {
-        session.value = parsed;
-        return;
-      } else {
-        localStorage.removeItem(SESSION_KEY);
-      }
-    } catch {
-      localStorage.removeItem(SESSION_KEY);
-    }
-  }
-
-  // Create new session
-  await createNewSession();
-}
-
-async function createNewSession() {
   isConnecting.value = true;
   connectionError.value = "";
 
   try {
-    const res = await fetch("http://localhost:5000/session?wait=true", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to create session: ${res.statusText}`);
-    }
-
-    const data = await res.json();
-    session.value = data;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(data));
-  } catch (error) {
-    connectionError.value = `Failed to create session: ${error}`;
+    await getSession();
+  } catch (err) {
+    connectionError.value = `Failed to create session: ${err}`;
   } finally {
     isConnecting.value = false;
   }
 }
 
+let terminalInitialized = false;
+
 async function initializeTerminal() {
-  if (!session.value || !terminalContainer.value) return;
+  if (terminalInitialized || !session.value || !terminalContainer.value) return;
+  terminalInitialized = true;
 
   terminal = new Terminal({
     cursorBlink: true,
@@ -162,7 +150,7 @@ async function initializeTerminal() {
     }
   });
 
-  // Simple resize handling
+  // Attach to resize event
   window.addEventListener("resize", () => {
     setTimeout(() => fitAddon.fit(), 100);
   });
@@ -202,6 +190,10 @@ async function connectWebSocket() {
           terminal.write(message.data);
         } else if (message.type === "error") {
           terminal.writeln(`\r\n\x1b[31mError: ${message.data}\x1b[0m\r\n`);
+        } else if (message.type == "message" && message.data == "ready"){
+          showInfoMessage( 
+          "This terminal supports multiple tabs and split panes using tmux, you may use standard keybinds to navigate or use the buttons/mouse."
+          );
         }
       } catch (error) {
         console.error("Failed to parse WebSocket message:", error);
@@ -225,8 +217,10 @@ async function connectWebSocket() {
   }
 }
 
+
 async function reconnect() {
   cleanup();
+  await initializeSession();
   await connectWebSocket();
 }
 
@@ -234,7 +228,7 @@ async function stopSession() {
   if (!session.value) return;
 
   try {
-    await fetch(`http://localhost:5000/session?sess=${session.value.id}`, {
+    await fetch(`${BACKEND_URL}/session?sess=${session.value.id}`, {
       method: "DELETE",
     });
     terminal.writeln(
@@ -266,10 +260,8 @@ function decreaseFontSize() {
 function updateFontSize() {
   if (terminal) {
     terminal.options.fontSize = fontSize.value;
-    // Simple font size update
     setTimeout(() => {
       fitAddon.fit();
-      // Send updated size to backend
       const { cols, rows } = terminal;
       if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.send(
@@ -283,7 +275,7 @@ function updateFontSize() {
   }
 }
 
-function tmuxCommand(keySequence) {
+function tmuxCommand(keySequence: string) {
   if (websocket && websocket.readyState === WebSocket.OPEN) {
     // First send the Ctrl+B prefix
     websocket.send(
@@ -310,7 +302,7 @@ function tmuxCommand(keySequence) {
   }
 }
 
-function sendTmuxCommand(command) {
+function sendTmuxCommand(command: string) {
   websocket.send(
     JSON.stringify({
       type: "tmux_command",
@@ -318,10 +310,29 @@ function sendTmuxCommand(command) {
     }),
   );
 }
+
+const infoMessage = ref("");
+let infoTimeout: number | null = null;
+
+function showInfoMessage(text: string, duration = 3000) {
+  infoMessage.value = text;
+  if (infoTimeout) clearTimeout(infoTimeout);
+  infoTimeout = setTimeout(() => {
+    infoMessage.value = "";
+    infoTimeout = null;
+  }, duration);
+}
 </script>
 
 <template>
   <div class="terminal-container">
+    <div
+  v-if="infoMessage"
+  class="absolute top-4 bg-zinc-800 text-white text-sm px-4 py-2 rounded shadow-lg pointer-events-none z-50 animate-fade-in-out"
+>
+  {{ infoMessage }}
+</div>
+
     <div
       class="terminal-header bg-zinc-800 text-white p-2 rounded-t-lg flex justify-between items-center"
     >
@@ -428,7 +439,7 @@ function sendTmuxCommand(command) {
           :disabled="isConnecting"
           class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
         >
-          {{ isConnecting ? "Connecting..." : "Reconnect" }}
+          {{ isConnecting ? "Connecting..." : (isConnected ? "Reconnect" : "Start") }}
         </button>
         <button
           @click="stopSession"
@@ -444,7 +455,6 @@ function sendTmuxCommand(command) {
       class="terminal-content bg-black rounded-b-lg"
       style="height: 400px; width: 100%"
     ></div>
-
     <div
       v-if="connectionError"
       class="mt-2 p-2 bg-red-900 text-red-200 rounded text-sm"
@@ -511,5 +521,15 @@ function sendTmuxCommand(command) {
 .terminal-content :deep(.xterm-selection-layer) {
   position: absolute;
   pointer-events: none;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(4px); }
+  10%, 90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+.animate-fade-in-out {
+  animation: fadeInOut 3s ease-in-out;
 }
 </style>

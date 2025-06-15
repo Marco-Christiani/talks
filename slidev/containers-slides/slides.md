@@ -31,20 +31,19 @@ Some text
 echo "Hello from container"
 ```
 
+<!--
 ```python {monaco-run}
 print("Hello from Python")
-```
+-->
 
 ---
 
 <!-- <Terminal :sessionId="mySession.id" :sessionPort="mySession.port" /> -->
 <Terminal />
 
----
-
+<!--
 <RunButton cmd="docker run hello-world" />
-
----
+-->
 
 <!-- src: pages/000-progressive-narrative.md -->
 

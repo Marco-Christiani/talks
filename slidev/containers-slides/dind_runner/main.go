@@ -124,12 +124,7 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// Start with a regular bash shell first
-	cmd := exec.Command("/bin/bash")
-	cmd.Env = append(os.Environ(),
-		"TERM=xterm-256color",
-		"PS1=\\u@\\h:\\w\\$ ",
-	)
+	cmd := exec.Command("/bin/bash", "-l")
 
 	// Create PTY
 	ptmx, err := pty.Start(cmd)
@@ -141,24 +136,24 @@ func terminalHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	defer ptmx.Close()
-
 	logger.Debug("Terminal session started", "pid", cmd.Process.Pid)
 
-	// Send welcome message and wait for user to press enter
-	welcomeMsg := `Welcome to the interactive terminal!
+	checkCmd := exec.Command("tmux", "has-session", "-t", "default")
+	// ptmx.Write([]byte("\r\033[K"))
+	// Check if session exists and attach or create
+	if checkCmd.Run() == nil {
+		logger.Debug("Attaching to tmux session")
+		ptmx.Write([]byte("tmux attach -t default\r"))
+	} else {
+		logger.Debug("Starting new tmux session")
+		ptmx.Write([]byte("tmux new-session -s default\r"))
+	}
+	defer ptmx.Close()
 
-This terminal supports multiple tabs and split panes using tmux.
-Press Enter to start tmux, or type commands directly in bash.
-
-`
 	conn.WriteJSON(TerminalMessage{
-		Type: "output",
-		Data: welcomeMsg,
+		Type: "message",
+		Data: "ready",
 	})
-
-	// Track if we've started tmux yet
-	tmuxStarted := false
 
 	// Handle WebSocket messages
 	go func() {
@@ -173,36 +168,17 @@ Press Enter to start tmux, or type commands directly in bash.
 			switch msg.Type {
 			case "input":
 				if data, ok := msg.Data.(string); ok {
-					// Check if this is the first enter press to start tmux
-					if !tmuxStarted && data == "\r" {
-						tmuxStarted = true
-						logger.Debug("Starting tmux session")
-
-						// Clear the line and start tmux
-						ptmx.Write([]byte("\r\033[K"))
-
-						// Check if session exists and attach or create
-						checkCmd := exec.Command("tmux", "has-session", "-t", "default")
-						if checkCmd.Run() == nil {
-							ptmx.Write([]byte("tmux attach -t default\r"))
-						} else {
-							ptmx.Write([]byte("tmux new-session -s default\r"))
-						}
-					} else {
-						ptmx.Write([]byte(data))
-					}
+					ptmx.Write([]byte(data))
 				}
 			case "tmux":
 				// Handle tmux commands from UI buttons
-				if tmuxStarted {
-					if data, ok := msg.Data.(string); ok {
-						// Send Ctrl+B prefix followed by the command key
-						ptmx.Write([]byte("\x02" + data))
-					}
+				if data, ok := msg.Data.(string); ok {
+					// Send Ctrl+B prefix followed by the command key
+					ptmx.Write([]byte("\x02" + data))
 				}
 
 			case "tmux_command":
-				if data, ok := msg.Data.(string); ok && tmuxStarted {
+				if data, ok := msg.Data.(string); ok {
 					args := strings.Fields(data)
 
 					cmd := exec.Command("tmux", args...)
