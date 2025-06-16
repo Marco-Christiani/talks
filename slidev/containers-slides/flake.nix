@@ -19,10 +19,12 @@
               (python312.withPackages (ps: [
                 ps.ruff
                 ps.uv
-                ps.flask
-                ps.flask-cors
+                ps.fastapi
+                ps.pydantic
+                ps.websockets
                 ps.requests
                 ps.uvicorn
+                ps.docker
               ]))
               bun
               cloudflared

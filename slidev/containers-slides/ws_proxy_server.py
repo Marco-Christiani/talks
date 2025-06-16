@@ -9,36 +9,68 @@
 # ]
 # ///
 
-# FASTAPI WS PROXY + SESSION BACKEND (replaces Flask backend)
+import asyncio
+import json
+import logging
+import os
+import sys
+import uuid
+from typing import Dict, Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+import docker
+import docker.errors
+import websockets
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import uuid, asyncio, json
-import websockets
-import docker
+import contextlib
 
-app = FastAPI()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger(__name__)
+
+sys.stdout.reconfigure(line_buffering=True)
+os.environ["PYTHONUNBUFFERED"] = "1"
+
+app = FastAPI(title="Docker Workshop Proxy", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 BASE_IMAGE = "dind-runner"
-NETWORK_NAME = "containers-slides_workshop"  # compose network name
-SESSIONS = {}  # session_id -> container_name
+SESSIONS: Dict[str, str] = {}  # session_id -> container_name
 
-# Initialize Docker client
-docker_client = docker.from_env()
+try:
+    docker_client = docker.from_env()
+    logger.info("Docker client initialized")
+except Exception as e:
+    logger.error(f"Failed to initialize Docker client: {e}")
+    raise
 
 
 class SessionInfo(BaseModel):
     id: str
 
 
-@app.post("/session")
+class CommandRequest(BaseModel):
+    cmd: str
+    timeout: Optional[int] = 30
+
+
+class CommandResponse(BaseModel):
+    output: str
+    exit_code: int
+    error: Optional[str] = None
+
+
+@app.post("/session", response_model=SessionInfo)
 async def create_session():
+    """Create a new Docker container session"""
     sess_id = f"session-{uuid.uuid4().hex[:8]}"
 
     try:
-        # Find the workshop network (handles compose prefixes dynamically)
+        # Find the workshop network
         all_networks = docker_client.networks.list()
         workshop_network = None
         for net in all_networks:
@@ -47,31 +79,35 @@ async def create_session():
                 break
 
         if not workshop_network:
-            raise Exception(f"No workshop network found. Available networks: {[n.name for n in all_networks]}")
+            available = [n.name for n in all_networks]
+            logger.error(f"No workshop network found. Available: {available}")
+            raise HTTPException(status_code=500, detail=f"Workshop network not found. Available: {available}")
 
         network_name = workshop_network.name
+        logger.info(f"Using network: {network_name}")
 
-        # Create container in the same network as the proxy
         container = docker_client.containers.run(
             BASE_IMAGE,
             name=sess_id,
             privileged=True,
             detach=True,
             network=network_name,
-            remove=False,  # Don't auto-remove so we can manage lifecycle
+            remove=False,
+            environment={"TERM": "xterm-256color", "DEBIAN_FRONTEND": "noninteractive"},
         )
 
         SESSIONS[sess_id] = sess_id
-        print(f"Created session {sess_id} in network {network_name}")
-        return {"id": sess_id}
+        logger.info(f"Created session {sess_id} in network {network_name}")
+        return SessionInfo(id=sess_id)
 
     except Exception as e:
-        print(f"Error creating session: {e}")
-        raise Exception(f"Failed to create session: {e}")
+        logger.error(f"Error creating session: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {e}")
 
 
 @app.get("/session")
 async def get_session(sess: str):
+    """Get session status"""
     try:
         container = docker_client.containers.get(sess)
         return {"ok": True, "status": container.status}
@@ -81,162 +117,223 @@ async def get_session(sess: str):
 
 @app.delete("/session")
 async def delete_session(sess: str):
+    """Delete a session and its container"""
     if sess in SESSIONS:
         try:
             container = docker_client.containers.get(sess)
             container.remove(force=True)
             del SESSIONS[sess]
+            logger.info(f"Deleted session {sess}")
             return {"deleted": sess}
         except docker.errors.NotFound:
             del SESSIONS[sess]
             return {"deleted": sess, "note": "Container already gone"}
         except Exception as e:
+            logger.error(f"Error deleting session {sess}: {e}")
             return {"error": f"Failed to delete: {e}"}
     return {"error": "Session not found"}
 
 
-@app.get("/ping")
-async def ping():
-    return {"ping": "pong"}
+@app.post("/run", response_model=CommandResponse)
+async def run_command(sess: str, request: CommandRequest):
+    """Execute a command in a session container using docker exec"""
+    if sess not in SESSIONS:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        container = docker_client.containers.get(sess)
+
+        # Execute command in container
+        result = container.exec_run(
+            request.cmd,
+            stderr=True,
+            stdout=True,
+            tty=False,
+            user="root",
+        )
+
+        output = result.output.decode("utf-8", errors="replace")
+
+        return CommandResponse(
+            output=output,
+            exit_code=result.exit_code,
+            error=None if result.exit_code == 0 else f"Command exited with code {result.exit_code}",
+        )
+
+    except docker.errors.NotFound:
+        raise HTTPException(status_code=404, detail="Container not found")
+    except docker.errors.APIError as e:
+        logger.error(f"Docker API error executing command in {sess}: {e}")
+        raise HTTPException(status_code=500, detail=f"Docker error: {e}")
+    except Exception as e:
+        logger.error(f"Error executing command in session {sess}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute command: {e}")
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    try:
+        docker_client.ping()
+        return {
+            "status": "healthy",
+            "docker": "connected",
+            "active_sessions": len(SESSIONS),
+            "sessions": list(SESSIONS.keys()),
+        }
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e), "active_sessions": len(SESSIONS)}
 
 
 @app.websocket("/ws")
 async def proxy_ws(client_ws: WebSocket):
-    print("WebSocket request received.")
+    """WebSocket proxy for terminal sessions"""
+    logger.info("WebSocket connection initiated")
     await client_ws.accept()
-    print("WebSocket accepted.")
 
     sess_id = client_ws.query_params.get("sess")
-    print(f"Session ID: {sess_id}")
-    print(f"Sessions available: {list(SESSIONS.keys())}")
 
     if not sess_id or sess_id not in SESSIONS:
-        print(f"Session {sess_id} not found in SESSIONS")
-        try:
-            await client_ws.close(code=1008)
-        except:
-            pass
+        logger.warning(f"Invalid session {sess_id}. Available: {list(SESSIONS.keys())}")
+        await client_ws.close(code=1008, reason="Session not found")
         return
 
-    print("Session validation passed")
+    logger.info(f"WebSocket proxy starting for session {sess_id}")
     container_ws = None
+
     try:
-        print("About to wait for container ready")
-        # Wait for container to be ready before connecting
+        # Wait for container's service to be up
         await wait_for_container_ready(sess_id)
-        print("Container is ready")
 
-        # Connect using container name as hostname (Docker networking)
+        # Connect to WS
         uri = f"ws://{sess_id}:8000/terminal"
-        print(f"Connecting to {uri}")
-
         container_ws = await websockets.connect(uri)
-        print("Connected to container WebSocket")
+        logger.info(f"Connected to container WebSocket: {uri}")
 
         async def forward_client_to_container():
-            print("Starting client_to_container forwarder")
+            """Forward messages from client to container"""
             try:
                 while True:
-                    try:
-                        message = await client_ws.receive_text()
-                        print(f"Received from client: {repr(message)}")
-
-                        # Forward the complete JSON message to maintain protocol compatibility
-                        # The Go backend expects the full JSON structure
-                        if container_ws:
-                            await container_ws.send(message)
-                            print(f"Sent to container: {repr(message)}")
-                        else:
-                            print("Container WS is None, breaking")
-                            break
-                    except WebSocketDisconnect:
-                        print("Client WebSocket disconnected")
-                        break
-                    except Exception as e:
-                        print(f"Error in client_to_container: {e}")
-                        break
+                    # Forward (JSON) message
+                    message = await client_ws.receive_text()
+                    await container_ws.send(message)
+            except WebSocketDisconnect:
+                logger.info("Client disconnected")
             except Exception as e:
-                print(f"Fatal error in client_to_container: {e}")
+                logger.error(f"Client->Container forwarding error: {e}")
 
         async def forward_container_to_client():
-            print("Starting container_to_client forwarder")
+            """Forward messages from container to client"""
             try:
                 async for message in container_ws:
-                    print(f"Received from container: {repr(message[:100])}")
-                    try:
-                        await client_ws.send_text(message)
-                    except Exception as e:
-                        print(f"Failed to send to client: {e}")
-                        break
+                    await client_ws.send_text(message)
             except Exception as e:
-                print(f"Error in container_to_client: {e}")
+                logger.error(f"Container->Client forwarding error: {e}")
 
-        # Start both forwarders
-        print("Creating tasks")
-        task1 = asyncio.create_task(forward_client_to_container())
-        task2 = asyncio.create_task(forward_container_to_client())
+        # Start bidirectional forwarding
+        client_task = asyncio.create_task(forward_client_to_container())
+        container_task = asyncio.create_task(forward_container_to_client())
 
-        print("Started both forwarding tasks")
+        # Wait for either connection to close
+        done, pending = await asyncio.wait([client_task, container_task], return_when=asyncio.FIRST_COMPLETED)
 
-        # Wait for either task to complete
-        done, pending = await asyncio.wait([task1, task2], return_when=asyncio.FIRST_COMPLETED)
-
-        # Cancel remaining tasks
+        # Clean up
         for task in pending:
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await task
-            except asyncio.CancelledError:
-                pass
 
-        print("WebSocket proxy session ended")
+        logger.info(f"WebSocket session {sess_id} ended")
 
     except Exception as e:
-        print(f"WebSocket proxy error: {e}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error(f"WebSocket proxy error for {sess_id}: {e}")
+        with contextlib.suppress(Exception):
+            await client_ws.send_text(json.dumps({"type": "error", "data": f"Connection error: {e}"}))
     finally:
-        print("Cleaning up")
-        # Clean up connections
+        # Cleanup
         if container_ws:
-            try:
+            with contextlib.suppress(Exception):
                 await container_ws.close()
-            except:
-                pass
 
         try:
             if client_ws.client_state.name != "DISCONNECTED":
                 await client_ws.close()
         except:
             pass
-        print("Cleanup complete")
+
+        logger.info(f"Cleaned up WebSocket session {sess_id}")
 
 
-async def wait_for_container_ready(sess_id: str, timeout: int = 30):
-    """Wait for container to be ready to accept connections"""
+async def wait_for_container_ready(sess_id: str, timeout: int = 30) -> None:
+    """Wait for container to be ready using Docker health check"""
     import time
 
     start_time = time.time()
+    logger.info(f"Waiting for container {sess_id} to be healthy...")
 
     while (time.time() - start_time) < timeout:
         try:
             container = docker_client.containers.get(sess_id)
-            if container.status == "running":
-                # Give the container a moment to fully start services
-                await asyncio.sleep(2)
 
-                # Try a quick connection test
-                try:
-                    test_ws = await asyncio.wait_for(websockets.connect(f"ws://{sess_id}:8000/terminal"), timeout=3.0)
-                    await test_ws.close()
-                    print(f"Container {sess_id} is ready")
+            # Check if container has health check configured (it definitely should...)
+            if container.attrs.get("Config", {}).get("Healthcheck"):
+                # Use Docker health check status
+                health_status = container.attrs.get("State", {}).get("Health", {}).get("Status", "").lower()
+                logger.debug(f"Container {sess_id} health status: {health_status}")
+
+                if health_status == "healthy":
+                    logger.info(f"Container {sess_id} is healthy")
                     return
-                except Exception as e:
-                    print(f"Container not ready yet: {e}")
+            else:
+                # Fallback: container is running and basic connectivity test
+                if container.status == "running":
+                    try:
+                        result = container.exec_run("echo ready")
+                        if result.exit_code == 0:
+                            logger.info(f"Container {sess_id} is running and responsive")
+                            return
+                    except Exception as e:
+                        logger.debug(f"Container {sess_id} not responsive yet: {e}")
 
             await asyncio.sleep(1)
+
         except docker.errors.NotFound:
             raise Exception(f"Container {sess_id} not found")
+        except Exception as e:
+            logger.debug(f"Error checking container {sess_id}: {e}")
+            await asyncio.sleep(1)
+
+    try:
+        container = docker_client.containers.get(sess_id)
+        logs = container.logs(tail=10).decode("utf-8", errors="replace")
+        logger.error(f"Container {sess_id} failed to become ready. Recent logs:\n{logs}")
+    except:
+        pass
 
     raise Exception(f"Container {sess_id} not ready after {timeout}s")
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("Docker Workshop Proxy starting up")
+    logger.info(f"Base image: {BASE_IMAGE}")
+    logger.info(f"Active sessions will be tracked in memory")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("Shutting down - cleaning up sessions")
+    for sess_id in list(SESSIONS.keys()):
+        try:
+            container = docker_client.containers.get(sess_id)
+            container.remove(force=True)
+            logger.info(f"Cleaned up session {sess_id}")
+        except:
+            pass
+    SESSIONS.clear()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("ws_proxy_server:app", host="0.0.0.0", port=5000, log_level="info", access_log=True)
