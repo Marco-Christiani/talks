@@ -20,6 +20,10 @@ set -g history-limit 10000
 # Enable vi mode for copy mode
 setw -g mode-keys vi
 
+# Copy selections to the outside world via OSC 52
+set -g set-clipboard on
+set -as terminal-features ',tmux-256color:clipboard'
+
 # Show pane numbers longer
 set -g display-panes-time 2000
 

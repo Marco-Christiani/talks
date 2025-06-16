@@ -4,6 +4,7 @@ import { ref, onMounted, onUnmounted, nextTick } from "vue";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
+import { ClipboardAddon } from "@xterm/addon-clipboard";
 import "@xterm/xterm/css/xterm.css";
 
 const terminalContainer = ref<HTMLElement>();
@@ -111,6 +112,9 @@ async function initializeTerminal() {
   fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
 
+  const clipAddon = new ClipboardAddon();
+  terminal.loadAddon(clipAddon);
+
   try {
     const webglAddon = new WebglAddon();
     terminal.loadAddon(webglAddon);
@@ -191,7 +195,7 @@ async function connectWebSocket() {
         } else if (message.type === "error") {
           terminal.writeln(`\r\n\x1b[31mError: ${message.data}\x1b[0m\r\n`);
         } else if (message.type == "message" && message.data == "ready"){
-          showInfoMessage( 
+          showMessage( 
           "This terminal supports multiple tabs and split panes using tmux, you may use standard keybinds to navigate or use the buttons/mouse."
           );
         }
@@ -311,41 +315,40 @@ function sendTmuxCommand(command: string) {
   );
 }
 
-const infoMessage = ref("");
-let infoTimeout: number | null = null;
 
-function showInfoMessage(text: string, duration = 3000) {
-  infoMessage.value = text;
-  if (infoTimeout) clearTimeout(infoTimeout);
-  infoTimeout = setTimeout(() => {
-    infoMessage.value = "";
-    infoTimeout = null;
-  }, duration);
+const infoMessage = ref<string | null>(null);
+let timeout: number | null = null;
+
+function showMessage(msg: string, durationMs = 5000) {
+  infoMessage.value = msg;
+
+  if (timeout !== null) {
+    clearTimeout(timeout);
+  }
+
+  timeout = window.setTimeout(() => {
+    infoMessage.value = null;
+  }, durationMs);
+}
+
+function onAfterLeave() {
+  timeout = null;
 }
 </script>
 
 <template>
   <div class="terminal-container">
-    <div
-  v-if="infoMessage"
-  class="absolute top-4 bg-zinc-800 text-white text-sm px-4 py-2 rounded shadow-lg pointer-events-none z-50 animate-fade-in-out"
->
-  {{ infoMessage }}
-</div>
+    <transition name="fade-message" @after-leave="onAfterLeave">
+      <div v-if="infoMessage"
+          class="absolute top-4 right-0 bg-zinc-800 text-white w-1/2 text-xs px-4 py-2 rounded shadow-md pointer-events-none z-50">
+        {{ infoMessage }}
+      </div>
+    </transition>
 
-    <div
-      class="terminal-header bg-zinc-800 text-white p-2 rounded-t-lg flex justify-between items-center"
-    >
+    <div class="terminal-header bg-zinc-800 text-white px-2 py-1 rounded-t-lg flex justify-between items-center">
       <div class="flex items-center gap-2">
-        <div
-          class="w-3 h-3 rounded-full"
-          :class="
-            isConnected
-              ? 'bg-green-500'
-              : isConnecting
-                ? 'bg-yellow-500'
-                : 'bg-red-500'
-          "
+        <div class="w-3 h-3 rounded-full"
+          :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500' "
         ></div>
         <span class="text-sm font-mono">
           {{ session ? `${session.id}:${session.port}` : "No session" }}
@@ -453,7 +456,7 @@ function showInfoMessage(text: string, duration = 3000) {
     <div
       ref="terminalContainer"
       class="terminal-content bg-black rounded-b-lg"
-      style="height: 400px; width: 100%"
+      style="height: 100%; width: 100%"
     ></div>
     <div
       v-if="connectionError"
@@ -469,12 +472,12 @@ function showInfoMessage(text: string, duration = 3000) {
       Creating new Docker session...
     </div>
 
-    <button
-      @click="showHelp = true"
-      class="mt-2 px-1 py-1 text-sm bg-blue-600 rounded hover:blue-500"
-    >
-      Help
-    </button>
+    <!-- <button -->
+    <!--   @click="showHelp = true" -->
+    <!--   class="mt-2 px-1 py-1 text-sm bg-blue-600 rounded hover:blue-500" -->
+    <!-- > -->
+    <!--   Help -->
+    <!-- </button> -->
     <!-- <div
       v-if="showHelp"
       class="help-overlay absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 text-black"
@@ -523,13 +526,20 @@ function showInfoMessage(text: string, duration = 3000) {
   pointer-events: none;
 }
 
-@keyframes fadeInOut {
-  0% { opacity: 0; transform: translateY(4px); }
-  10%, 90% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-4px); }
+.fade-message-enter-active,
+.fade-message-leave-active {
+  transition: opacity 0.5s ease, transform 0.5s ease;
 }
 
-.animate-fade-in-out {
-  animation: fadeInOut 3s ease-in-out;
+.fade-message-enter-from,
+.fade-message-leave-to {
+  opacity: 0;
+  transform: translateX(100px);
+}
+
+.fade-message-enter-to,
+.fade-message-leave-from {
+  opacity: 1;
+  transform: translateX(0);
 }
 </style>

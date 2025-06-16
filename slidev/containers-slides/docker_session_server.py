@@ -179,6 +179,11 @@ def delete_session():
 
 @app.route("/run", methods=["POST"])
 def proxy_run():
+    """A testing endpoint for development purposes that submits commands to a container via websocket.
+
+    In reality, we could directly execute the command in the container using `docker exec <container_name>`
+    which is why this is a debugging functionality. This can be removed in the future.
+    """
     sess_id = request.args.get("sess") or ""
     session = State().get_session(sess_id)
     if session is None:

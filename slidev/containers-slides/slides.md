@@ -26,10 +26,26 @@ hideInToc: true
 # This is text
 
 Some text
+<style>
+.slidev-runner-output{
+  max-height: 300px !important;
+  overflow-y: scroll !important;
+}
+pre.shiki {
+  display: inline-block;
+  max-height: 300px;
+  overflow-y: auto;
+  background: #111;
+  border: 1px solid red;
+}
+</style>
 
-```bash {monaco-run}
-echo "Hello from container"
+```bash {monaco-run} {autorun:false, height: 'auto'}
+docker run hello-world
+docker run hello-world
 ```
+
+
 
 <!--
 ```python {monaco-run}
@@ -37,13 +53,18 @@ print("Hello from Python")
 -->
 
 ---
+layout: full
+routeAlias: terminal
+hideInToc: true
+transition: fade
+---
 
-<!-- <Terminal :sessionId="mySession.id" :sessionPort="mySession.port" /> -->
 <Terminal />
+<TerminalToggle />
 
-<!--
+---
+
 <RunButton cmd="docker run hello-world" />
--->
 
 <!-- src: pages/000-progressive-narrative.md -->
 

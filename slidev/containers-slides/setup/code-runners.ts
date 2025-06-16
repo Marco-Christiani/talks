@@ -21,7 +21,7 @@ export default defineCodeRunnersSetup(() => {
     return {
       text: output,
       class: "text-green-400",
-      highlightLang: "shell",
+      highlightLang: "text",
     };
   }
 
