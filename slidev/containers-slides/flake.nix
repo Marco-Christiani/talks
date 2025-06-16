@@ -22,8 +22,10 @@
                 ps.flask
                 ps.flask-cors
                 ps.requests
+                ps.uvicorn
               ]))
               bun
+              cloudflared
             ];
 
             shellHook = ''

@@ -11,4 +11,7 @@ export default defineConfig({
       '@lib': resolve(__dirname, './lib'),
     },
   },
+  server: {
+    allowedHosts: ['docker-workshop.com'],
+  },
 })

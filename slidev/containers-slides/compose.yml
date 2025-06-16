@@ -1,0 +1,40 @@
+# compose.yml
+
+services:
+  slidev:
+    image: oven/bun:latest
+    working_dir: /slides
+    volumes:
+      - .:/slides
+    environment:
+      - ROLLUP_USE_WASM=true
+    command: >
+      sh -c "bun install &&
+             bunx slidev build &&
+             bunx serve -s dist -l 3000"
+    ports:
+      - "3000:3000"
+    networks:
+      - workshop
+
+  proxy:
+    image: python:3.12-slim-bookworm
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - UVICORN_HOST=0.0.0.0
+      - UVICORN_PORT=5000
+    entrypoint: >
+      sh -c "apt-get update && apt-get install -y docker.io &&
+             pip install uvicorn fastapi websockets docker &&
+             uvicorn ws_proxy_server:app --proxy-headers --forwarded-allow-ips='*'"
+    ports:
+      - "5000:5000"
+    networks:
+      - workshop
+
+networks:
+  workshop:
+    driver: bridge

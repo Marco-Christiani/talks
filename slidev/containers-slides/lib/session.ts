@@ -19,10 +19,16 @@ import { ref } from 'vue';
 
 export interface Session {
   id: string;
-  port: number;
 }
 
-export const BACKEND_URL = "http://localhost:5000";
+export const BACKEND_HOST =
+  window.location.hostname === "localhost"
+    ? "localhost:5000"
+    : "docker-workshop.com";
+export const BACKEND_HTTP_URL =
+  window.location.hostname === "localhost"
+    ? `http://${BACKEND_HOST}`
+    : `https://${BACKEND_HOST}`;
 export const SESSION_KEY = "docker-session";
 
 const session = ref<Session | null>(null);
@@ -38,7 +44,7 @@ export async function getSession(): Promise<Session> {
   const cached = localStorage.getItem(SESSION_KEY);
   if (cached) {
     const parsed: Session = JSON.parse(cached);
-    const res = await fetch(`${BACKEND_URL}/session?sess=${parsed.id}`);
+    const res = await fetch(`${BACKEND_HTTP_URL}/session?sess=${parsed.id}`);
     if (res.ok) {
       session.value = parsed;
       return parsed;
@@ -47,7 +53,7 @@ export async function getSession(): Promise<Session> {
   }
 
   if (!inFlight) {
-    inFlight = fetch(`${BACKEND_URL}/session?wait=true`, {
+    inFlight = fetch(`${BACKEND_HTTP_URL}/session?wait=true`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     })

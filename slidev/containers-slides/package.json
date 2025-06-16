@@ -24,9 +24,10 @@
     "ws": "^8.18.2"
   },
   "devDependencies": {
+    "@rollup/wasm-node": "^4.43.0",
     "@slidev/theme-seriph": "latest",
+    "playwright-chromium": "^1.52.0",
     "slidev-addon-excalidraw": "^1.0.4",
-    "slidev-theme-neversink": "^0.3.6",
-    "playwright-chromium": "^1.52.0"
+    "slidev-theme-neversink": "^0.3.6"
   }
 }

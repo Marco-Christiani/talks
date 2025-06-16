@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from "vue";
-  import { BACKEND_URL, getSession, SESSION_KEY, useSession } from '@lib/session';
+import { BACKEND_HTTP_URL, getSession, SESSION_KEY, useSession } from '@lib/session';
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -169,7 +169,11 @@ async function connectWebSocket() {
   connectionError.value = "";
 
   try {
-    const wsUrl = `ws://localhost:${session.value.port}/terminal`;
+    const wsUrl =
+      window.location.hostname === "localhost"
+        ? `ws://localhost:${session.value.port}/terminal`
+        : `wss://${window.location.hostname}/ws?sess=${session.value.id}`;
+    console.log(`Connecting to ${wsUrl}`)
     websocket = new WebSocket(wsUrl);
 
     websocket.onopen = () => {
@@ -194,9 +198,9 @@ async function connectWebSocket() {
           terminal.write(message.data);
         } else if (message.type === "error") {
           terminal.writeln(`\r\n\x1b[31mError: ${message.data}\x1b[0m\r\n`);
-        } else if (message.type == "message" && message.data == "ready"){
-          showMessage( 
-          "This terminal supports multiple tabs and split panes using tmux, you may use standard keybinds to navigate or use the buttons/mouse."
+        } else if (message.type == "message" && message.data == "ready") {
+          showMessage(
+            "This terminal supports multiple tabs and split panes using tmux, you may use standard keybinds to navigate or use the buttons/mouse."
           );
         }
       } catch (error) {
@@ -232,7 +236,7 @@ async function stopSession() {
   if (!session.value) return;
 
   try {
-    await fetch(`${BACKEND_URL}/session?sess=${session.value.id}`, {
+    await fetch(`${BACKEND_HTTP_URL}/session?sess=${session.value.id}`, {
       method: "DELETE",
     });
     terminal.writeln(
@@ -340,7 +344,7 @@ function onAfterLeave() {
   <div class="terminal-container">
     <transition name="fade-message" @after-leave="onAfterLeave">
       <div v-if="infoMessage"
-          class="absolute top-4 right-0 bg-zinc-800 text-white w-1/2 text-xs px-4 py-2 rounded shadow-md pointer-events-none z-50">
+        class="absolute top-4 right-0 bg-zinc-800 text-white w-1/2 text-xs px-4 py-2 rounded shadow-md pointer-events-none z-50">
         {{ infoMessage }}
       </div>
     </transition>
@@ -348,51 +352,35 @@ function onAfterLeave() {
     <div class="terminal-header bg-zinc-800 text-white px-2 py-1 rounded-t-lg flex justify-between items-center">
       <div class="flex items-center gap-2">
         <div class="w-3 h-3 rounded-full"
-          :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500' "
-        ></div>
+          :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'"></div>
         <span class="text-sm font-mono">
           {{ session ? `${session.id}:${session.port}` : "No session" }}
         </span>
 
         <!-- Window Controls -->
         <div class="tmux-controls flex gap-2 ml-4">
-          <button
-            @click="tmuxCommand('c')"
-            class="px-1 py-1 text-xs bg-green-600 rounded hover:bg-green-500"
-            title="New Window (Ctrl+b, c)"
-          >
+          <button @click="tmuxCommand('c')" class="px-1 py-1 text-xs bg-green-600 rounded hover:bg-green-500"
+            title="New Window (Ctrl+b, c)">
             <MdiAdd />
           </button>
-          <button
-            @click="tmuxCommand('p')"
-            class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
-            title="Previous Window (Ctrl+b, p)"
-          >
+          <button @click="tmuxCommand('p')" class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+            title="Previous Window (Ctrl+b, p)">
             <MdiArrowLeft />
           </button>
-          <button
-            @click="tmuxCommand('n')"
-            class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
-            title="Next Window (Ctrl+b, n)"
-          >
+          <button @click="tmuxCommand('n')" class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+            title="Next Window (Ctrl+b, n)">
             <MdiArrowRight />
           </button>
 
           <!-- Pane controls -->
-          <button
-            @click="tmuxCommand('o')"
-            class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-orange-500"
-            title="Switch Pane (Ctrl+b, o)"
-          >
+          <button @click="tmuxCommand('o')" class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-orange-500"
+            title="Switch Pane (Ctrl+b, o)">
             <MdiWindowRestore />
             <!-- <MdiAlignVerticalDistribute /> -->
             <!-- <MdiDragVerticalVariant /> -->
           </button>
-          <button
-            @click="tmuxCommand('%')"
-            class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
-            title="Split Vertical (Ctrl+b, %)"
-          >
+          <button @click="tmuxCommand('%')" class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
+            title="Split Vertical (Ctrl+b, %)">
             <MdiAlignHorizontalDistribute />
           </button>
           <!-- <button @click="tmuxCommand('\"')"
@@ -419,56 +407,34 @@ function onAfterLeave() {
       </div>
       <div class="flex gap-2">
         <div class="flex items-center gap-1">
-          <button
-            @click="decreaseFontSize"
-            :disabled="fontSize <= 8"
+          <button @click="decreaseFontSize" :disabled="fontSize <= 8"
             class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
-            title="Decrease font size"
-          >
+            title="Decrease font size">
             -
           </button>
           <span class="text-xs px-1">{{ fontSize }}px</span>
-          <button
-            @click="increaseFontSize"
-            :disabled="fontSize >= 24"
+          <button @click="increaseFontSize" :disabled="fontSize >= 24"
             class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
-            title="Increase font size"
-          >
+            title="Increase font size">
             +
           </button>
         </div>
-        <button
-          @click="reconnect"
-          :disabled="isConnecting"
-          class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
-        >
+        <button @click="reconnect" :disabled="isConnecting"
+          class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50">
           {{ isConnecting ? "Connecting..." : (isConnected ? "Reconnect" : "Start") }}
         </button>
-        <button
-          @click="stopSession"
-          class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500"
-        >
+        <button @click="stopSession" class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500">
           Stop
         </button>
       </div>
     </div>
 
-    <div
-      ref="terminalContainer"
-      class="terminal-content bg-black rounded-b-lg"
-      style="height: 100%; width: 100%"
-    ></div>
-    <div
-      v-if="connectionError"
-      class="mt-2 p-2 bg-red-900 text-red-200 rounded text-sm"
-    >
+    <div ref="terminalContainer" class="terminal-content bg-black rounded-b-lg" style="height: 100%; width: 100%"></div>
+    <div v-if="connectionError" class="mt-2 p-2 bg-red-900 text-red-200 rounded text-sm">
       {{ connectionError }}
     </div>
 
-    <div
-      v-if="isConnecting && !session"
-      class="mt-2 p-2 bg-yellow-900 text-yellow-200 rounded text-sm"
-    >
+    <div v-if="isConnecting && !session" class="mt-2 p-2 bg-yellow-900 text-yellow-200 rounded text-sm">
       Creating new Docker session...
     </div>
 

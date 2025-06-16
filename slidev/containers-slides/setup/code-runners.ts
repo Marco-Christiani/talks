@@ -1,7 +1,6 @@
 import { defineCodeRunnersSetup } from "@slidev/types";
-import { getSession } from "@lib/session";
+import { getSession, BACKEND_HTTP_URL } from "@lib/session";
 
-const BACKEND_URL = "http://localhost:5000";
 
 export default defineCodeRunnersSetup(() => {
   async function run(code: string, lang: "sh" | "bash" | "python") {
@@ -11,7 +10,7 @@ export default defineCodeRunnersSetup(() => {
       code = `python3 -c ${JSON.stringify(code)}`;
     }
 
-    const res = await fetch(`${BACKEND_URL}/run?sess=${session.id}`, {
+    const res = await fetch(`${BACKEND_HTTP_URL}/run?sess=${session.id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cmd: code }),

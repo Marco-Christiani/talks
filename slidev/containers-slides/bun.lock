@@ -19,6 +19,7 @@
         "ws": "^8.18.2",
       },
       "devDependencies": {
+        "@rollup/wasm-node": "^4.43.0",
         "@slidev/theme-seriph": "latest",
         "playwright-chromium": "^1.52.0",
         "slidev-addon-excalidraw": "^1.0.4",
@@ -262,6 +263,8 @@
     "@rollup/rollup-win32-ia32-msvc": ["@rollup/rollup-win32-ia32-msvc@4.39.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-6w9uMuza+LbLCVoNKL5FSLE7yvYkq9laSd09bwS0tMjkwXrmib/4KmoJcrKhLWHvw19mwU+33ndC69T7weNNjQ=="],
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.39.0", "", { "os": "win32", "cpu": "x64" }, "sha512-yAkUOkIKZlK5dl7u6dg897doBgLXmUHhIINM2c+sND3DZwnrdQkkSiDh7N75Ll4mM4dxSkYfXqU9fW3lLkMFug=="],
+
+    "@rollup/wasm-node": ["@rollup/wasm-node@4.43.0", "", { "dependencies": { "@types/estree": "1.0.7" }, "optionalDependencies": { "fsevents": "~2.3.2" }, "bin": { "rollup": "dist/bin/rollup" } }, "sha512-8oXXm1Fnu+CkZDwGu6gPc3Hz46pNBydHoixTSo/kPNkpFePIKySPuTI9feqI94Ka/vlHpa8VhvFRUwkRC30TMw=="],
 
     "@shikijs/core": ["@shikijs/core@3.5.0", "", { "dependencies": { "@shikijs/types": "3.5.0", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.4", "hast-util-to-html": "^9.0.5" } }, "sha512-iycvvnVG7MWZHRNuoqpYkV3Qc8DNLU74Lxh/roDwUqJJoXRnCTbbVJGfSWAdBslUgJMsjSHwFL42i55voavDDg=="],
 

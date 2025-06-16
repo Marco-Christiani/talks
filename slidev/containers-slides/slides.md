@@ -40,10 +40,10 @@ pre.shiki {
 }
 </style>
 
-```bash {monaco-run} {autorun:false, height: 'auto'}
-docker run hello-world
-docker run hello-world
-```
+<!-- ```bash {monaco-run} {autorun:false, height: 'auto'} -->
+<!-- docker run hello-world -->
+<!-- docker run hello-world -->
+<!-- ``` -->
 
 
 
