@@ -15,53 +15,56 @@ title: Containerization
 mdc: true
 addons:
   - slidev-addon-excalidraw
+  - tldraw
 layout: cover
 hideInToc: true
 ---
+
 
 # A header
 
 ---
 
-# This is text
+## Board
 
-Some text
-<style>
-.slidev-runner-output{
-  max-height: 300px !important;
-  overflow-y: scroll !important;
-}
-pre.shiki {
-  display: inline-block;
-  max-height: 300px;
-  overflow-y: auto;
-  background: #111;
-  border: 1px solid red;
-}
-</style>
+<tldraw class="inset-0 w-full h-full" doc="tldraw/doc-VB7EcrPHwsr6tgD6WPsJg.json"></tldraw>
+
+---
+
+# Welcome to your sandbox
+
+<div class="grid grid-cols-2 gap-4">
+
+<div>
+
+```python {monaco-run} {autorun:false}
+# file: app.py
+print('Hello from the workspace!')
+```
+
+</div>
+
+
+<div>
+
+```dockerfile {monaco-run} {autorun:false}
+# file: Dockerfile
+FROM python:3.12-slim
+COPY app.py .
+CMD ["python3", "app.py"]
+```
+</div>
+</div>
+
+```bash {monaco-run} {autorun:false}
+docker build -t myapp . && docker run myapp
+```
+
 
 <!-- ```bash {monaco-run} {autorun:false, height: 'auto'} -->
 <!-- docker run hello-world -->
 <!-- docker run hello-world -->
 <!-- ``` -->
-
-
-
-<!--
-```python {monaco-run}
-print("Hello from Python")
--->
-
----
-layout: full
-routeAlias: terminal
-hideInToc: true
-transition: fade
----
-
-<Terminal />
-<TerminalToggle />
-
 ---
 
 <RunButton cmd="docker run hello-world" />

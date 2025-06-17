@@ -1,0 +1,13 @@
+# FILE: styles.css
+.slidev-runner-output {
+  max-height: 15vh !important;
+  overflow-y: auto !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+
+pre.shiki {
+  display: inline-block;
+  overflow-y: auto;
+  /* max-height: 20vh !important; */
+}

@@ -1,3 +1,4 @@
+# ws_proxy_server.py
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
@@ -10,20 +11,23 @@
 # ///
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
 import sys
+import tarfile
+import io
 import uuid
 from typing import Dict, Optional
 
 import docker
 import docker.errors
 import websockets
+from docker.models.containers import Container
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import contextlib
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,8 +36,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-sys.stdout.reconfigure(line_buffering=True)
 os.environ["PYTHONUNBUFFERED"] = "1"
+if isinstance(sys.stdout, io.TextIOWrapper):
+    sys.stdout.reconfigure(line_buffering=True)
 
 app = FastAPI(title="Docker Workshop Proxy", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -51,11 +56,6 @@ except Exception as e:
 
 class SessionInfo(BaseModel):
     id: str
-
-
-class CommandRequest(BaseModel):
-    cmd: str
-    timeout: Optional[int] = 30
 
 
 class CommandResponse(BaseModel):
@@ -134,40 +134,103 @@ async def delete_session(sess: str):
     return {"error": "Session not found"}
 
 
+class CommandRequest(BaseModel):
+    cmd: str
+    workspace_id: Optional[str] = None
+    timeout: Optional[int] = 30
+
+
 @app.post("/run", response_model=CommandResponse)
 async def run_command(sess: str, request: CommandRequest):
-    """Execute a command in a session container using docker exec"""
+    """Execute a command or write files based on content"""
+    await wait_for_container_ready(sess)
     if sess not in SESSIONS:
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
         container = docker_client.containers.get(sess)
+        workspace_id = request.workspace_id or sess
+        workspace_dir = f"/workspace/{workspace_id}"
+        container.exec_run(f"mkdir -p {workspace_dir}")
 
-        # Execute command in container
-        result = container.exec_run(
-            request.cmd,
-            stderr=True,
-            stdout=True,
-            tty=False,
-            user="root",
-        )
-
-        output = result.output.decode("utf-8", errors="replace")
-
-        return CommandResponse(
-            output=output,
-            exit_code=result.exit_code,
-            error=None if result.exit_code == 0 else f"Command exited with code {result.exit_code}",
-        )
+        # Check if this is a file write operation
+        if request.cmd.strip().startswith("# file:"):
+            return handle_file_write(container, workspace_dir, request.cmd)
+        else:
+            return handle_command_execution(container, workspace_dir, request.cmd)
 
     except docker.errors.NotFound:
         raise HTTPException(status_code=404, detail="Container not found")
-    except docker.errors.APIError as e:
-        logger.error(f"Docker API error executing command in {sess}: {e}")
-        raise HTTPException(status_code=500, detail=f"Docker error: {e}")
     except Exception as e:
-        logger.error(f"Error executing command in session {sess}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to execute command: {e}")
+        logger.error(f"Error in session {sess}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to execute: {e}")
+
+
+def handle_file_write(container: Container, workspace_dir: str, content: str) -> CommandResponse:
+    """Write file using Docker's put_archive method"""
+    lines = content.strip().split("\n")
+
+    if not lines[0].startswith("# file:"):
+        raise ValueError("Expected file declaration")
+
+    file_path = lines[0][7:].strip()
+    if not file_path:
+        raise ValueError("No file path specified")
+
+    file_content = "\n".join(lines[1:])
+
+    try:
+        # Create an in-memory tar file
+        tar_stream = io.BytesIO()
+        tar = tarfile.TarFile(fileobj=tar_stream, mode="w")
+
+        # Create tar
+        file_data = file_content.encode("utf-8")
+        tarinfo = tarfile.TarInfo(name=os.path.basename(file_path))
+        tarinfo.size = len(file_data)
+        tarinfo.mode = 0o644
+        tar.addfile(tarinfo, io.BytesIO(file_data))
+        tar.close()
+
+        # Get tar bytes
+        tar_stream.seek(0)
+        tar_bytes = tar_stream.read()
+
+        # Ensure target directory exists
+        file_dir = os.path.dirname(f"{workspace_dir}/{file_path}")
+        if file_dir != workspace_dir:
+            container.exec_run(["mkdir", "-p", file_dir])
+
+        # Put the file into the container
+        target_dir = os.path.dirname(f"{workspace_dir}/{file_path}")
+        container.put_archive(target_dir, tar_bytes)
+
+        return CommandResponse(output=f"File written: {file_path}", exit_code=0, error=None)
+
+    except Exception as e:
+        return CommandResponse(
+            output=f"Error writing file: {str(e)}", exit_code=1, error=f"Failed to write file: {file_path}"
+        )
+
+
+def handle_command_execution(container: Container, workspace_dir: str, cmd: str) -> CommandResponse:
+    """Execute command in workspace directory"""
+    result = container.exec_run(
+        ["bash", "-c", cmd],
+        stderr=True,
+        stdout=True,
+        tty=False,
+        user="root",
+        workdir=workspace_dir,
+    )
+
+    output = result.output.decode("utf-8", errors="replace")
+
+    return CommandResponse(
+        output=output,
+        exit_code=result.exit_code,
+        error=None if result.exit_code == 0 else f"Command exited with code {result.exit_code}",
+    )
 
 
 @app.get("/health")
@@ -301,7 +364,7 @@ async def wait_for_container_ready(sess_id: str, timeout: int = 30) -> None:
             raise Exception(f"Container {sess_id} not found")
         except Exception as e:
             logger.debug(f"Error checking container {sess_id}: {e}")
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
 
     try:
         container = docker_client.containers.get(sess_id)

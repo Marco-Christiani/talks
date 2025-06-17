@@ -1,3 +1,4 @@
+<!-- components/RunButton.vue -->
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { getSession, useSession, SESSION_KEY, BACKEND_HTTP_URL } from "@lib/session";
@@ -60,6 +61,14 @@ async function stopSession() {
 
 <template>
   <div class="p-2 bg-zinc-800 rounded-lg text-white text-left">
+    <div class="flex gap-2 mb-2">
+      <button @click="runCommand" :disabled="isRunning" class="text-xs px-1 py-1 bg-blue-600 rounded hover:bg-blue-500">
+        Run
+      </button>
+      <button @click="stopSession" class="text-xs px-1 py-1 bg-red-600 rounded hover:bg-red-500">
+        Stop Session
+      </button>
+    </div>
     <div class="mb-2 font-mono text-sm">
       Command: <code>{{ cmd }}</code>
     </div>
@@ -70,15 +79,7 @@ async function stopSession() {
     <div class="mb-2 text-sm text-green-400" v-else-if="session">
       Connected: <code>{{ session.id }}</code>
     </div>
-    <div class="flex gap-2 mb-2">
-      <button @click="runCommand" :disabled="isRunning" class="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500">
-        Run
-      </button>
-      <button @click="stopSession" class="px-3 py-1 bg-red-600 rounded hover:bg-red-500">
-        Stop Session
-      </button>
-    </div>
-    <pre class="bg-black text-green-400 p-2 rounded max-h-64 overflow-auto text-xs whitespace-pre-wrap">{{ output }}
+    <pre class="bg-black text-green-400 p-2 rounded max-h-80 overflow-auto text-xs whitespace-pre-wrap">{{ output }}
     </pre>
   </div>
 </template>

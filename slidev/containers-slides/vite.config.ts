@@ -1,3 +1,4 @@
+// FILE: vite.config.ts
 // vite.config.ts
 import { defineConfig } from 'vite'
 import { fileURLToPath } from 'url'

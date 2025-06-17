@@ -20,6 +20,7 @@
     "express": "^5.1.0",
     "node-pty": "^1.0.0",
     "shiki": "^3.5.0",
+    "slidev-addon-tldraw": "^0.4.2",
     "vue": "^3.5.16",
     "ws": "^8.18.2"
   },
