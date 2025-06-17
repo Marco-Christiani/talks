@@ -170,8 +170,8 @@ async function connectWebSocket() {
 
   try {
     const wsUrl =
-      window.location.hostname === "localhost"
-        ? `ws://localhost:${session.value.port}/terminal`
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+        ? `ws://127.0.0.1:5000/ws?sess=${session.value.id}`
         : `wss://${window.location.hostname}/ws?sess=${session.value.id}`;
     console.log(`Connecting to ${wsUrl}`)
     websocket = new WebSocket(wsUrl);
@@ -179,7 +179,7 @@ async function connectWebSocket() {
     websocket.onopen = () => {
       isConnected.value = true;
       isConnecting.value = false;
-      terminal.writeln("\r\n\x1b[32mTerminal connected!\x1b[0m\r\n");
+      terminal.writeln("\r\n\x1b[32mConnected! Starting session...\x1b[0m\r\n");
 
       // Send initial terminal size
       const { cols, rows } = terminal;

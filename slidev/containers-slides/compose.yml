@@ -8,6 +8,11 @@ services:
       - .:/slides
     environment:
       - ROLLUP_USE_WASM=true
+    # Dev:
+    # command: >
+    #   sh -c "bun install &&
+    #          bun run slidev --port 3000 --remote"
+    # Prod:
     command: >
       sh -c "bun install &&
              bunx slidev build &&
@@ -21,7 +26,7 @@ services:
     image: python:3.12-slim-bookworm
     working_dir: /app
     volumes:
-      - .:/app
+      - ./ws_proxy_server.py:/app/ws_proxy_server.py
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - UVICORN_HOST=0.0.0.0

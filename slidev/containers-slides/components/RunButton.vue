@@ -1,99 +1,60 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
+import { getSession, useSession, SESSION_KEY, BACKEND_HTTP_URL } from "@lib/session";
 
 const props = defineProps<{
   cmd: string;
 }>();
 
-type Session = {
-  id: string;
-  port: number;
-};
-
-const session = ref<Session | null>(null);
+const session = useSession();
 const output = ref("");
 const isRunning = ref(false);
 const isConnected = ref(false);
 const isConnecting = ref(false);
 
-const SESSION_KEY = "docker-session";
-
 onMounted(async () => {
-  const saved = localStorage.getItem(SESSION_KEY);
-  if (saved) {
-    try {
-      const parsed: Session = JSON.parse(saved);
-      const check = await fetch(
-        `http://localhost:5000/session?sess=${parsed.id}`,
-      );
-      if (check.ok) {
-        isConnected.value = true;
-        session.value = parsed;
-        output.value = `Reconnected to existing session ${parsed.id}`;
-      } else {
-        isConnected.value = false;
-        localStorage.removeItem(SESSION_KEY);
-      }
-    } catch {
-      isConnected.value = false;
-      localStorage.removeItem(SESSION_KEY);
-    }
-  }
-});
-
-async function ensureSession() {
-  if (session.value) return;
-
   isConnecting.value = true;
   try {
-    const res = await fetch("http://localhost:5000/session?wait=true", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      isConnected.value = false;
-      console.log(data);
-      alert("Failed to create session");
-    } else {
-      session.value = data;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(data));
-      isConnected.value = true;
-    }
-    output.value = "";
+    await getSession();
+    isConnected.value = true;
+    output.value = `Connected to session ${session.value?.id}`;
+  } catch (err) {
+    isConnected.value = false;
+    output.value = `Failed to connect: ${err}`;
+    console.error(err);
   } finally {
     isConnecting.value = false;
   }
-}
+});
 
 async function runCommand() {
-  await ensureSession();
   if (!session.value) return;
 
   isRunning.value = true;
   output.value = "Running...";
 
-  const res = await fetch(
-    `http://localhost:5000/run?sess=${session.value.id}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cmd: props.cmd }),
-    },
-  );
+  const res = await fetch(`${BACKEND_HTTP_URL}/run?sess=${session.value.id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd: props.cmd }),
+  });
 
-  output.value = await res.text();
+  const respJson = await res.json();
+  output.value = respJson.output;
   isRunning.value = false;
 }
 
 async function stopSession() {
   if (!session.value) return;
-  await fetch(`http://localhost:5000/session?sess=${session.value.id}`, {
+
+  await fetch(`${BACKEND_HTTP_URL}/session?sess=${session.value.id}`, {
     method: "DELETE",
   });
+
   output.value += `\nSession ${session.value.id} stopped`;
   localStorage.removeItem(SESSION_KEY);
   session.value = null;
+  isConnected.value = false;
 }
 </script>
 
@@ -107,26 +68,17 @@ async function stopSession() {
       Connecting to Docker sandbox...
     </div>
     <div class="mb-2 text-sm text-green-400" v-else-if="session">
-      Connected: <code>{{ session.id }}@{{ session.port }}</code>
+      Connected: <code>{{ session.id }}</code>
     </div>
     <div class="flex gap-2 mb-2">
-      <button
-        @click="runCommand"
-        :disabled="isRunning"
-        class="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500"
-      >
+      <button @click="runCommand" :disabled="isRunning" class="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500">
         Run
       </button>
-      <button
-        @click="stopSession"
-        class="px-3 py-1 bg-red-600 rounded hover:bg-red-500"
-      >
+      <button @click="stopSession" class="px-3 py-1 bg-red-600 rounded hover:bg-red-500">
         Stop Session
       </button>
     </div>
-    <pre
-      class="bg-black text-green-400 p-2 rounded max-h-64 overflow-auto text-xs whitespace-pre-wrap"
-      >{{ output }}</pre
-    >
+    <pre class="bg-black text-green-400 p-2 rounded max-h-64 overflow-auto text-xs whitespace-pre-wrap">{{ output }}
+    </pre>
   </div>
 </template>

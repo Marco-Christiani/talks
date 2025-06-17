@@ -295,7 +295,7 @@ async def wait_for_container_ready(sess_id: str, timeout: int = 30) -> None:
                     except Exception as e:
                         logger.debug(f"Container {sess_id} not responsive yet: {e}")
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.1)
 
         except docker.errors.NotFound:
             raise Exception(f"Container {sess_id} not found")

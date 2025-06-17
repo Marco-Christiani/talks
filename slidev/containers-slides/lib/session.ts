@@ -22,11 +22,11 @@ export interface Session {
 }
 
 export const BACKEND_HOST =
-  window.location.hostname === "localhost"
-    ? "localhost:5000"
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ? "127.0.0.1:5000"
     : "docker-workshop.com";
 export const BACKEND_HTTP_URL =
-  window.location.hostname === "localhost"
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
     ? `http://${BACKEND_HOST}`
     : `https://${BACKEND_HOST}`;
 export const SESSION_KEY = "docker-session";
