@@ -8,10 +8,10 @@ export default defineShikiSetup(() => {
       "zsh",
       "yaml",
       "docker",
+      "dockerfile",
       "markdown",
       "python",
-      import("@shikijs/langs/hcl"),
-      import("@shikijs/langs/dockerfile"),
+      "hcl",
     ],
   };
 });

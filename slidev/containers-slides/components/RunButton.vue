@@ -1,53 +1,48 @@
 <!-- components/RunButton.vue -->
 <script setup lang="ts">
-import { ref } from "vue";
-import { getSession, useSession, SESSION_KEY, BACKEND_HTTP_URL } from "@lib/session";
+import { ref, onMounted } from "vue";
+import { useSession, useSessionActions, getSession } from "@lib/session";
 
-type RunButtonProps = {
-  cmd?: string;
-};
+const props = withDefaults(defineProps<{ cmd?: string }>(), {});
 
-const props = withDefaults(defineProps<RunButtonProps>(), {});
+const { session, isConnecting } = useSession();
+const { runCommand, stopSession, clearSession } = useSessionActions();
 
-const session = useSession();
 const output = ref<string | null>(null);
 const isRunning = ref(false);
-const isConnecting = ref(false);
+const out = ref<HTMLElement | null>(null);
 
-async function runCommand() {
-  if (!session.value) return;
-
+async function execute() {
+  if (!props.cmd) return;
   isRunning.value = true;
   output.value = "Running...";
 
-  const res = await fetch(`${BACKEND_HTTP_URL}/run?sess=${session.value.id}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cmd: props.cmd }),
-  });
-
-  const respJson = await res.json();
-  output.value = respJson.output;
-  isRunning.value = false;
+  try {
+    const result = await runCommand(props.cmd);
+    output.value = result.error ? `Error: ${result.error}` : result.output;
+  } catch (err) {
+    output.value = `Unexpected error: ${err}`;
+  } finally {
+    isRunning.value = false;
+  }
 }
 
-async function stopSession() {
-  if (!session.value) return;
-
-  await fetch(`${BACKEND_HTTP_URL}/session?sess=${session.value.id}`, {
-    method: "DELETE",
-  });
-
+async function stopAndClear() {
+  await stopSession();
   clearOutput();
-  localStorage.removeItem(SESSION_KEY);
-  session.value = null;
 }
 
-async function clearOutput() {
+function clearOutput() {
   output.value = null;
 }
 
-const out = ref<HTMLElement | null>(null);
+onMounted(async () => {
+  try {
+    await getSession();
+  } catch (err) {
+    console.warn("Session unavailable:", err);
+  }
+});
 </script>
 
 <template>
@@ -69,24 +64,23 @@ const out = ref<HTMLElement | null>(null);
       >
         Connect
       </button>
-      <button v-else @click="stopSession" class="px-1 py-1 text-xs text-mono bg-red-600 rounded hover:bg-red-500">
+      <button v-else @click="stopAndClear" class="px-1 py-1 text-xs text-mono bg-red-600 rounded hover:bg-red-500">
         Stop
       </button>
       <button
         v-if="cmd && session"
-        @click="runCommand"
+        @click="execute"
         :disabled="isRunning || !session"
         class="px-1 py-1 text-xs text-mono bg-blue-600 rounded hover:bg-blue-500"
       >
         Run
       </button>
     </div>
-    <!-- End Connection Bar -->
+    <!-- Output -->
     <div v-if="cmd">
       <div class="my-2 font-mono text-sm">
         Command: <code>{{ cmd }}</code>
       </div>
-      <!-- <div v-if="output" class="bg-zinc-900 rounded max-h-80 overflow-auto text-xs whitespace-pre-wrap"> -->
       <div
         v-if="output"
         ref="out"

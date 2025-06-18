@@ -1,26 +1,22 @@
 <!-- components/Terminal.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
-import { BACKEND_HTTP_URL, getSession, SESSION_KEY, useSession } from "@lib/session";
+import { useSession, getSession, useWebSocket, useSessionActions } from "@lib/session";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import "@xterm/xterm/css/xterm.css";
 
-const props = defineProps<{
-  show: boolean;
-}>();
-
-const emit = defineEmits<{
-  close: [];
-}>();
+const props = defineProps<{ show: boolean }>();
+const emit = defineEmits<{ close: [] }>();
 
 const terminalContainer = ref<HTMLElement>();
-const session = useSession();
+const { session, isConnecting, connectionError } = useSession();
+const { stopSession, clearSession } = useSessionActions();
+const { createTerminalWebSocket } = useWebSocket();
+
 const isConnected = ref(false);
-const isConnecting = ref(false);
-const connectionError = ref("");
 const fontSize = ref(14);
 
 let terminal: Terminal;
@@ -28,7 +24,6 @@ let fitAddon: FitAddon;
 let websocket: WebSocket | null = null;
 let terminalInitialized = false;
 
-// Watch for popup visibility changes
 watch(
   () => props.show,
   async (newShow) => {
@@ -43,73 +38,33 @@ watch(
         }
       }, 100);
     } else {
-      // Clean up when closing
       cleanup();
     }
   },
 );
 
-onMounted(async () => {
-  if (props.show) {
-    await initializeSession();
-  }
+onMounted(() => {
+  if (props.show) initializeSession();
+  document.addEventListener("keydown", handleKeydown);
 });
-
-function refitTerminal() {
-  if (!terminal || !fitAddon) return;
-
-  fitAddon.fit();
-
-  const { cols, rows } = terminal;
-  if (cols > 2 && rows > 1 && websocket && websocket.readyState === WebSocket.OPEN) {
-    websocket.send(
-      JSON.stringify({
-        type: "resize",
-        data: { cols, rows },
-      }),
-    );
-  }
-}
 
 onUnmounted(() => {
   cleanup();
+  document.removeEventListener("keydown", handleKeydown);
 });
 
-function cleanup() {
-  if (websocket) {
-    websocket.close();
-    websocket = null;
-  }
-  if (terminal) {
-    terminal.dispose();
-    terminal = null;
-  }
-  isConnected.value = false;
-  terminalInitialized = false;
-}
-
 async function initializeSession() {
-  isConnecting.value = true;
-  connectionError.value = "";
-
   try {
     await getSession();
   } catch (err) {
     connectionError.value = `Failed to create session: ${err}`;
-  } finally {
-    isConnecting.value = false;
   }
 }
 
 async function initializeTerminal() {
   if (!session.value || !terminalContainer.value) return;
 
-  // Clear any existing terminal content
-  if (terminal) {
-    terminal.dispose();
-  }
-
-  // Clear the container
+  if (terminal) terminal.dispose();
   terminalContainer.value.innerHTML = "";
 
   terminal = new Terminal({
@@ -122,53 +77,31 @@ async function initializeTerminal() {
       cursor: "#ffffff",
       selectionForeground: "#3d3d3d",
     },
-    allowTransparency: false,
     convertEol: true,
     scrollback: 1000,
   });
 
   fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
-
-  const clipAddon = new ClipboardAddon();
-  terminal.loadAddon(clipAddon);
+  terminal.loadAddon(new ClipboardAddon());
 
   try {
-    const webglAddon = new WebglAddon();
-    terminal.loadAddon(webglAddon);
-  } catch {
-    // WebGL not supported, fallback to canvas renderer
-  }
+    terminal.loadAddon(new WebglAddon());
+  } catch { }
 
   terminal.open(terminalContainer.value);
-
-  // Single fit after DOM is ready
   await nextTick();
-  setTimeout(() => {
-    fitAddon.fit();
-  }, 100);
+  setTimeout(() => fitAddon.fit(), 100);
 
-  // Handle terminal input
   terminal.onData((data) => {
-    if (websocket && websocket.readyState === WebSocket.OPEN) {
-      websocket.send(
-        JSON.stringify({
-          type: "input",
-          data: data,
-        }),
-      );
+    if (websocket?.readyState === WebSocket.OPEN) {
+      websocket.send(JSON.stringify({ type: "input", data }));
     }
   });
 
-  // Handle terminal resize
   terminal.onResize(({ cols, rows }) => {
-    if (websocket && websocket.readyState === WebSocket.OPEN) {
-      websocket.send(
-        JSON.stringify({
-          type: "resize",
-          data: { cols, rows },
-        }),
-      );
+    if (websocket?.readyState === WebSocket.OPEN) {
+      websocket.send(JSON.stringify({ type: "resize", data: { cols, rows } }));
     }
   });
 
@@ -177,83 +110,74 @@ async function initializeTerminal() {
 
 async function connectWebSocket() {
   if (!session.value) return;
-
-  isConnecting.value = true;
-  connectionError.value = "";
-
   try {
-    const wsUrl =
-      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-        ? `ws://127.0.0.1:5000/ws?sess=${session.value.id}`
-        : `wss://${window.location.hostname}/ws?sess=${session.value.id}`;
-
-    websocket = new WebSocket(wsUrl);
+    websocket = await createTerminalWebSocket(session.value.id);
 
     websocket.onopen = () => {
       isConnected.value = true;
-      isConnecting.value = false;
       terminal.writeln("\r\n\x1b[32mConnected! Starting session...\x1b[0m\r\n");
-
       const { cols, rows } = terminal;
-      websocket?.send(
-        JSON.stringify({
-          type: "resize",
-          data: { cols, rows },
-        }),
-      );
+      websocket.send(JSON.stringify({ type: "resize", data: { cols, rows } }));
     };
 
     websocket.onmessage = (event) => {
+      if (!terminal) return;
       try {
         const message = JSON.parse(event.data);
-        if (message.type === "output" && message.data) {
-          terminal.write(message.data);
-        } else if (message.type === "error") {
-          terminal.writeln(`\r\n\x1b[31mError: ${message.data}\x1b[0m\r\n`);
-        }
+        if (message.type === "output") terminal.write(message.data);
+        else if (message.type === "error") terminal.writeln(`\r\n\x1b[31mError: ${message.data}\x1b[0m\r\n`);
       } catch (error) {
-        console.error("Failed to parse WebSocket message:", error);
+        console.error("Failed to parse message:", error);
       }
     };
 
     websocket.onclose = () => {
       isConnected.value = false;
-      terminal.writeln("\r\n\x1b[33mConnection closed\x1b[0m\r\n");
+      if (terminal) terminal.writeln("\r\n\x1b[33mConnection closed\x1b[0m\r\n");
     };
 
-    websocket.onerror = (error) => {
+    websocket.onerror = () => {
       isConnected.value = false;
-      isConnecting.value = false;
       connectionError.value = "WebSocket connection failed";
-      terminal.writeln("\r\n\x1b[31mConnection error\x1b[0m\r\n");
+      if (terminal) terminal.writeln("\r\n\x1b[31mConnection error\x1b[0m\r\n");
     };
-  } catch (error) {
-    isConnecting.value = false;
-    connectionError.value = `Connection failed: ${error}`;
+  } catch (err) {
+    connectionError.value = `Connection failed: ${err}`;
   }
 }
+
+function cleanup() {
+  if (websocket) {
+    websocket.onopen = null;
+    websocket.onmessage = null;
+    websocket.onclose = null;
+    websocket.onerror = null;
+    websocket.close();
+  }
+
+  websocket = null;
+  terminal?.dispose();
+  terminal = null;
+  isConnected.value = false;
+  terminalInitialized = false;
+}
+
 
 async function reconnect() {
   cleanup();
   await initializeSession();
-  await connectWebSocket();
+  await nextTick();             // wait for DOM
+  await initializeTerminal();   // rebuild XTerm + container + socket
 }
 
-async function stopSession() {
-  if (!session.value) return;
 
-  try {
-    await fetch(`${BACKEND_HTTP_URL}/session?sess=${session.value.id}`, {
-      method: "DELETE",
-    });
-    terminal.writeln(`\r\n\x1b[33mSession ${session.value.id} stopped\x1b[0m\r\n`);
-  } catch (error) {
-    terminal.writeln(`\r\n\x1b[31mFailed to stop session: ${error}\x1b[0m\r\n`);
+function refitTerminal() {
+  if (!terminal || !fitAddon) return;
+  fitAddon.fit();
+  const { cols, rows } = terminal;
+  if (cols > 2 && rows > 1 && websocket?.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify({ type: "resize", data: { cols, rows } }));
   }
-
-  localStorage.removeItem(SESSION_KEY);
-  session.value = null;
-  cleanup();
 }
 
 function increaseFontSize() {
@@ -277,138 +201,76 @@ function updateFontSize() {
       fitAddon.fit();
       const { cols, rows } = terminal;
       if (websocket && websocket.readyState === WebSocket.OPEN) {
-        websocket.send(
-          JSON.stringify({
-            type: "resize",
-            data: { cols, rows },
-          }),
-        );
+        websocket.send(JSON.stringify({ type: "resize", data: { cols, rows } }));
       }
     }, 100);
   }
 }
 
 function tmuxCommand(keySequence: string) {
-  if (websocket && websocket.readyState === WebSocket.OPEN) {
-    websocket.send(
-      JSON.stringify({
-        type: "input",
-        data: "\x02",
-      }),
-    );
-
-    for (const ch of keySequence) {
-      setTimeout(() => {
-        fitAddon.fit();
-      }, 100);
-
-      websocket.send(
-        JSON.stringify({
-          type: "input",
-          data: ch,
-        }),
-      );
-    }
+  if (websocket?.readyState !== WebSocket.OPEN) return;
+  websocket.send(JSON.stringify({ type: "input", data: "\x02" }));
+  for (const ch of keySequence) {
+    websocket.send(JSON.stringify({ type: "input", data: ch }));
   }
 }
 
 function sendTmuxCommand(command: string) {
-  websocket.send(
-    JSON.stringify({
-      type: "tmux_command",
-      data: command,
-    }),
-  );
+  if (websocket?.readyState === WebSocket.OPEN) {
+    websocket.send(JSON.stringify({ type: "tmux_command", data: command }));
+  }
 }
 
 function closePopup() {
   emit("close");
 }
 
-// Handle ESC key to close popup
 function handleKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" && props.show) {
-    closePopup();
-  }
+  if (event.key === "Escape" && props.show) closePopup();
 }
-
-onMounted(() => {
-  document.addEventListener("keydown", handleKeydown);
-});
-
-onUnmounted(() => {
-  document.removeEventListener("keydown", handleKeydown);
-});
 </script>
 
 <template>
   <!-- Modal Backdrop -->
   <Teleport to="body">
-    <div
-      v-if="show"
-      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center"
-      style="z-index: 9999"
-      @click="closePopup"
-    >
+    <div v-if="show" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center" style="z-index: 9999"
+      @click="closePopup">
       <!-- Modal Content -->
-      <div
-        class="bg-zinc-900 rounded-lg shadow-2xl w-[90vw] h-[80vh] max-w-6xl flex flex-col relative"
-        style="z-index: 10000"
-        @click.stop
-      >
+      <div class="bg-zinc-900 rounded-lg shadow-2xl w-[90vw] h-[80vh] max-w-6xl flex flex-col relative"
+        style="z-index: 10000" @click.stop>
         <!-- Header with close button -->
         <div class="terminal-header bg-zinc-800 text-white px-2 py-1 rounded-t-lg flex justify-between items-center">
           <div class="flex items-center gap-2">
-            <div
-              class="w-3 h-3 rounded-full"
-              :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'"
-            ></div>
+            <div class="w-3 h-3 rounded-full"
+              :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'"></div>
             <span class="text-sm font-mono">
               {{ session ? session.id : "No session" }}
             </span>
 
             <!-- Window Controls -->
             <div class="tmux-controls flex gap-2 ml-4">
-              <button
-                @click="tmuxCommand('c')"
-                class="px-1 py-1 text-xs bg-green-600 rounded hover:bg-green-500"
-                title="New Window (Ctrl+b, c)"
-              >
+              <button @click="tmuxCommand('c')" class="px-1 py-1 text-xs bg-green-600 rounded hover:bg-green-500"
+                title="New Window (Ctrl+b, c)">
                 +
               </button>
-              <button
-                @click="tmuxCommand('p')"
-                class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
-                title="Previous Window (Ctrl+b, p)"
-              >
+              <button @click="tmuxCommand('p')" class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+                title="Previous Window (Ctrl+b, p)">
                 ←
               </button>
-              <button
-                @click="tmuxCommand('n')"
-                class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
-                title="Next Window (Ctrl+b, n)"
-              >
+              <button @click="tmuxCommand('n')" class="px-1 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500"
+                title="Next Window (Ctrl+b, n)">
                 →
               </button>
-              <button
-                @click="tmuxCommand('o')"
-                class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-orange-500"
-                title="Switch Pane (Ctrl+b, o)"
-              >
+              <button @click="tmuxCommand('o')" class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-orange-500"
+                title="Switch Pane (Ctrl+b, o)">
                 ⧉
               </button>
-              <button
-                @click="tmuxCommand('%')"
-                class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
-                title="Split Vertical (Ctrl+b, %)"
-              >
+              <button @click="tmuxCommand('%')" class="px-2 py-1 text-xs bg-purple-600 rounded hover:bg-purple-500"
+                title="Split Vertical (Ctrl+b, %)">
                 |
               </button>
-              <button
-                @click="sendTmuxCommand('kill-pane')"
-                class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500"
-                title="Close Pane"
-              >
+              <button @click="sendTmuxCommand('kill-pane')"
+                class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500" title="Close Pane">
                 ×
               </button>
             </div>
@@ -417,41 +279,29 @@ onUnmounted(() => {
           <div class="flex gap-2 items-center">
             <!-- Font size controls -->
             <div class="flex items-center gap-1">
-              <button
-                @click="decreaseFontSize"
-                :disabled="fontSize <= 8"
+              <button @click="decreaseFontSize" :disabled="fontSize <= 8"
                 class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
-                title="Decrease font size"
-              >
+                title="Decrease font size">
                 -
               </button>
               <span class="text-xs px-1">{{ fontSize }}px</span>
-              <button
-                @click="increaseFontSize"
-                :disabled="fontSize >= 24"
+              <button @click="increaseFontSize" :disabled="fontSize >= 24"
                 class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 disabled:opacity-50"
-                title="Increase font size"
-              >
+                title="Increase font size">
                 +
               </button>
             </div>
 
             <!-- Connection controls -->
-            <button
-              @click="reconnect"
-              :disabled="isConnecting"
-              class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
-            >
+            <button @click="reconnect" :disabled="isConnecting"
+              class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50">
               {{ isConnecting ? "Connecting..." : isConnected ? "Reconnect" : "Start" }}
             </button>
             <button @click="stopSession" class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500">Stop</button>
 
             <!-- Close popup button -->
-            <button
-              @click="closePopup"
-              class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 ml-2"
-              title="Close Terminal (ESC)"
-            >
+            <button @click="closePopup" class="px-2 py-1 text-xs bg-gray-600 rounded hover:bg-gray-500 ml-2"
+              title="Close Terminal (ESC)">
               ✕
             </button>
           </div>

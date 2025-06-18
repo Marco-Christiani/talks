@@ -9,6 +9,7 @@ services:
     environment:
       - ROLLUP_USE_WASM=true
     # Dev:
+    # DO NOT DELETE
     command: >
       sh -c "bun install &&
              bun run slidev --port 3000 --remote"

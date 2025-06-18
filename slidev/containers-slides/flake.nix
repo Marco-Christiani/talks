@@ -7,7 +7,7 @@
 
   outputs = { self, nixpkgs }:
     let
-      pkgs = system: import nixpkgs { system = system; };
+      pkgs = system: import nixpkgs { system = system; config.allowUnfree=true;};
     in
     {
       devShells = builtins.mapAttrs (system: pkgs: {
@@ -21,19 +21,21 @@
                 ps.uv
                 ps.fastapi
                 ps.pydantic
-                ps.websockets
-                ps.requests
                 ps.uvicorn
+                ps.websockets
                 ps.docker
               ]))
               bun
               cloudflared
+              terraform
+              awscli2
             ];
 
             shellHook = ''
                 echo ${pkgs.go} ${pkgs.gopls}
                 echo ${pkgs.uv}
                 echo ${pkgs.bun}
+                echo ${pkgs.terraform}
             '';
           };
         }) {
