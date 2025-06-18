@@ -20,7 +20,6 @@ layout: cover
 hideInToc: true
 ---
 
-
 # A header
 
 ---
@@ -44,7 +43,6 @@ print('Hello from the workspace!')
 
 </div>
 
-
 <div>
 
 ```dockerfile {monaco-run} {autorun:false}
@@ -53,19 +51,22 @@ FROM python:3.12-slim
 COPY app.py .
 CMD ["python3", "app.py"]
 ```
+
 </div>
+
 </div>
 
 ```bash {monaco-run} {autorun:false}
 docker build -t myapp . && docker run myapp
 ```
 
-
 <!-- ```bash {monaco-run} {autorun:false, height: 'auto'} -->
 <!-- docker run hello-world -->
 <!-- docker run hello-world -->
-<!-- ``` -->
+
 ---
+
+## New slide
 
 <RunButton cmd="docker run hello-world" />
 

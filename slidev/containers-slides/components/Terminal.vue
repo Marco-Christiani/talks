@@ -1,12 +1,7 @@
 <!-- components/Terminal.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
-import {
-  BACKEND_HTTP_URL,
-  getSession,
-  SESSION_KEY,
-  useSession,
-} from "@lib/session";
+import { BACKEND_HTTP_URL, getSession, SESSION_KEY, useSession } from "@lib/session";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -66,12 +61,7 @@ function refitTerminal() {
   fitAddon.fit();
 
   const { cols, rows } = terminal;
-  if (
-    cols > 2 &&
-    rows > 1 &&
-    websocket &&
-    websocket.readyState === WebSocket.OPEN
-  ) {
+  if (cols > 2 && rows > 1 && websocket && websocket.readyState === WebSocket.OPEN) {
     websocket.send(
       JSON.stringify({
         type: "resize",
@@ -193,8 +183,7 @@ async function connectWebSocket() {
 
   try {
     const wsUrl =
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
+      window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
         ? `ws://127.0.0.1:5000/ws?sess=${session.value.id}`
         : `wss://${window.location.hostname}/ws?sess=${session.value.id}`;
 
@@ -257,9 +246,7 @@ async function stopSession() {
     await fetch(`${BACKEND_HTTP_URL}/session?sess=${session.value.id}`, {
       method: "DELETE",
     });
-    terminal.writeln(
-      `\r\n\x1b[33mSession ${session.value.id} stopped\x1b[0m\r\n`,
-    );
+    terminal.writeln(`\r\n\x1b[33mSession ${session.value.id} stopped\x1b[0m\r\n`);
   } catch (error) {
     terminal.writeln(`\r\n\x1b[31mFailed to stop session: ${error}\x1b[0m\r\n`);
   }
@@ -370,22 +357,14 @@ onUnmounted(() => {
         @click.stop
       >
         <!-- Header with close button -->
-        <div
-          class="terminal-header bg-zinc-800 text-white px-2 py-1 rounded-t-lg flex justify-between items-center"
-        >
+        <div class="terminal-header bg-zinc-800 text-white px-2 py-1 rounded-t-lg flex justify-between items-center">
           <div class="flex items-center gap-2">
             <div
               class="w-3 h-3 rounded-full"
-              :class="
-                isConnected
-                  ? 'bg-green-500'
-                  : isConnecting
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500'
-              "
+              :class="isConnected ? 'bg-green-500' : isConnecting ? 'bg-yellow-500' : 'bg-red-500'"
             ></div>
             <span class="text-sm font-mono">
-              {{ session ? `${session.id}:${session.port}` : "No session" }}
+              {{ session ? session.id : "No session" }}
             </span>
 
             <!-- Window Controls -->
@@ -463,20 +442,9 @@ onUnmounted(() => {
               :disabled="isConnecting"
               class="px-2 py-1 text-xs bg-blue-600 rounded hover:bg-blue-500 disabled:opacity-50"
             >
-              {{
-                isConnecting
-                  ? "Connecting..."
-                  : isConnected
-                    ? "Reconnect"
-                    : "Start"
-              }}
+              {{ isConnecting ? "Connecting..." : isConnected ? "Reconnect" : "Start" }}
             </button>
-            <button
-              @click="stopSession"
-              class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500"
-            >
-              Stop
-            </button>
+            <button @click="stopSession" class="px-2 py-1 text-xs bg-red-600 rounded hover:bg-red-500">Stop</button>
 
             <!-- Close popup button -->
             <button
@@ -490,24 +458,14 @@ onUnmounted(() => {
         </div>
 
         <!-- Terminal content -->
-        <div
-          ref="terminalContainer"
-          class="terminal-content bg-black rounded-b-lg flex-1"
-          style="width: 100%"
-        ></div>
+        <div ref="terminalContainer" class="terminal-content bg-black rounded-b-lg flex-1" style="width: 100%"></div>
 
         <!-- Error display -->
-        <div
-          v-if="connectionError"
-          class="mx-2 mb-2 p-2 bg-red-900 text-red-200 rounded text-sm"
-        >
+        <div v-if="connectionError" class="mx-2 mb-2 p-2 bg-red-900 text-red-200 rounded text-sm">
           {{ connectionError }}
         </div>
 
-        <div
-          v-if="isConnecting && !session"
-          class="mx-2 mb-2 p-2 bg-yellow-900 text-yellow-200 rounded text-sm"
-        >
+        <div v-if="isConnecting && !session" class="mx-2 mb-2 p-2 bg-yellow-900 text-yellow-200 rounded text-sm">
           Creating new Docker session...
         </div>
       </div>

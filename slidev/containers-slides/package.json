@@ -30,5 +30,8 @@
     "playwright-chromium": "^1.52.0",
     "slidev-addon-excalidraw": "^1.0.4",
     "slidev-theme-neversink": "^0.3.6"
+  },
+  "prettier": {
+    "printWidth": 120
   }
 }
