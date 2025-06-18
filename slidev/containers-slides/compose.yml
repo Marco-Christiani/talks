@@ -2,17 +2,16 @@
 
 services:
   slidev:
-    image: oven/bun:latest
+    build: .
     working_dir: /slides
     volumes:
       - .:/slides
     environment:
       - ROLLUP_USE_WASM=true
     # Dev:
-    # DO NOT DELETE
-    command: >
-      sh -c "bun install &&
-             bun run slidev --port 3000 --remote"
+    # command: >
+    #   sh -c "bun install &&
+    #          bun run slidev --port 3000 --remote"
     # Prod:
     # command: >
     #   sh -c "bun install &&
@@ -25,8 +24,6 @@ services:
     #       target: /slides
     #       ignore:
     #         - node_modules/
-    ports:
-      - "3000:3000"
     networks:
       - workshop
 
