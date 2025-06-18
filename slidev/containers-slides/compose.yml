@@ -27,6 +27,13 @@ services:
     networks:
       - workshop
 
+  dind-runner:
+    build:
+      context: .
+      dockerfile: dind_runner/Dockerfile
+    image: dind-runner
+    profiles: ["build-only"] # not a service just build it
+
   proxy:
     image: python:3.12-slim-bookworm
     working_dir: /app
