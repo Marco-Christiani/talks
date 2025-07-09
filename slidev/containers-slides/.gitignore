@@ -9,4 +9,3 @@ components.d.ts
 __pycache__
 .direnv/
 infra/terraform.tfvars
-.terraform.*

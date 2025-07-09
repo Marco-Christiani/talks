@@ -1,0 +1,14 @@
+.DS_Store
+.git/
+dist/
+infra/
+.zed/
+.direnv/
+.venv/
+__pycache__/
+node_modules/
+*.log
+*.bak
+*.pdf
+*.pptx
+.envrc

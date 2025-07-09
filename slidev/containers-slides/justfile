@@ -5,8 +5,8 @@ dind-runner-build:
     docker build -t dind-runner dind_runner
 
 
-dind-server:
-    DEBUG=1 uv run docker_session_server.py
+dind-proxy-server:
+    uv run ws_proxy_server.py
 
 [script("bash")]
 dind-test:
@@ -25,5 +25,19 @@ dind-test:
     docker logs -f $sess_id
     curl -X DELETE http://localhost:5000/session?sess=$sess_id
 
-stop-sessions ancestor="dind-runner":
-  docker container ls --format='{{{{.Names}}' --filter "ancestor={{ancestor}}" | xargs -I {} docker stop {}
+stop-sessions +flags:
+  docker container ls --format='{{{{.Names}}' --filter "ancestor=dind-runner" {{flags}} | xargs -I {} docker stop {}
+
+
+tf-rebuild-ec2:
+    terraform destroy -target=aws_instance.workshop -target=aws_eip_association.workshop
+    terraform apply -target=aws_instance.workshop -target=aws_eip_association.workshop
+
+tf-up:
+    terraform apply -auto-approve
+
+cf-up:
+    cloudflared tunnel --config infra/cf-config-prod.yml run docker-workshop
+
+ec2-ssh:
+    ssh -o PubkeyAcceptedAlgorithms=+ssh-rsa -o HostKeyAlgorithms=+ssh-rsa -i .ssh/workshop_key ubuntu@$(terraform output -raw instance_ip)

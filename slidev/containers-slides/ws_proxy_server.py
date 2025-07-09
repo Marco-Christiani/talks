@@ -209,7 +209,7 @@ def handle_file_write(container: Container, workspace_dir: str, content: str) ->
 
     except Exception as e:
         return CommandResponse(
-            output=f"Error writing file: {str(e)}", exit_code=1, error=f"Failed to write file: {file_path}"
+            output=f"Error writing file: {e!s}", exit_code=1, error=f"Failed to write file: {file_path}"
         )
 
 

@@ -2,16 +2,19 @@
 
 services:
   slidev:
-    build: .
+    image: oven/bun:latest
+    # build: slides.Dockerfile
     working_dir: /slides
     volumes:
       - .:/slides
     environment:
       - ROLLUP_USE_WASM=true
     # Dev:
-    # command: >
-    #   sh -c "bun install &&
-    #          bun run slidev --port 3000 --remote"
+    command: >
+      sh -c "bun install &&
+             bun run slidev --port 3000 --remote"
+    ports:
+      - "3000:3000"
     # Prod:
     # command: >
     #   sh -c "bun install &&
