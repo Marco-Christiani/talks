@@ -1,0 +1,27 @@
+# cp ~/.cloudflared/XXXXXX.json infra/cf-creds.json
+# use --config infa/cf-config-local.yml
+# cloudflared tunnel login
+# cloudflared tunnel create docker-workshop
+# cloudflared tunnel route dns docker-workshop docker-workshop.com
+# cloudflared tunnel run docker-workshop
+tunnel: docker-workshop
+# credentials-file: ~/.cloudflared/XXXXXX.json
+credentials-file: infra/cf-creds.json
+
+ingress:
+  # PTY WebSocket
+  - hostname: docker-workshop.com
+    path: /ws*
+    service: http://localhost:5000
+
+  # REST session API
+  - hostname: docker-workshop.com
+    path: /session*
+    service: http://localhost:5000
+
+  # Slide deck and other static assets
+  - hostname: docker-workshop.com
+    service: http://localhost:3000
+
+  # catch-all
+  - service: http_status:404

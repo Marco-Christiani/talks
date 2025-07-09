@@ -1,0 +1,16 @@
+# In prod only slides are locally hosted...
+# use --config infa/cf-config-local.yml
+tunnel: docker-workshop
+# credentials-file: ~/.cloudflared/XXXXXX.json
+# cp ~/.cloudflared/XXXXXX.json infra/cf-creds.json
+credentials-file: infra/cf-creds.json
+
+ingress:
+  - hostname: docker-workshop.com
+    service: http://127.0.0.1:3000
+
+  # All API/WebSocket traffic now goes directly to api.docker-workshop.com
+  # Handled by Terraform DNS records, not this tunnel
+
+  # catch-all
+  - service: http_status:404
