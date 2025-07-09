@@ -2,63 +2,6 @@
 layout: section
 ---
 
-# Lesson 5: Docker Tools & Commands
-
----
-
-## Essential Docker Commands
-
-- `build`
-- `run`
-- `exec -it`
-- `container ls/rm/etc`
-- `image ls/rm/etc`
-- `volume ls/rm/etc` (maybe)
-
----
-
-## Container, Image, System Management
-
-<div class="grid grid-cols-3 gap-4">
-
-<div>
-
-### Container Management
-- `docker run`
-- `docker exec`
-- `docker stop`
-- `docker rm` (same as `container rm`)
-
-</div>
-
-<div>
-
-### Image Management
-- `docker build`
-- `docker pull`
-- `docker push`
-- `docker rmi` same as `image rm`
-
-</div>
-
-<div>
-
-### System & Info
-- `docker ps` (same as `container ls`)
-- `docker logs`
-- `docker inspect`
-- `docker system prune`
-
-</div>
-</div>
-
-Discoverability of Docker commands
-
-```bash
-docker container
-docker image
-docker system
-```
 
 ---
 
@@ -93,7 +36,7 @@ services:
 
 ### Docker Bake
 - Advanced build system
-- HCL or JSON configuration
+- HCL or JSON configs
 - Matrix builds and targets
 
 ```hcl
@@ -108,4 +51,4 @@ target "default" {
 ```
 
 </div>
-</div> 
+</div>

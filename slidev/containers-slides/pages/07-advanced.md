@@ -20,53 +20,85 @@ https://docs.docker.com/reference/dockerfile/#run---mount
 
 ---
 
-## COPY args
+## Heredocs
 
-```dockerfile
-FROM python:3.12-slim AS builder
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+- Super useful for shell scripting in general, not just Docker (i.e. `bash`, `zsh`)
+- TLDR: It lets you inline a file.
 
-# Change the working directory to the `app` directory
-WORKDIR /app
+Basic syntax:
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-editable
-
-# Copy the project into the intermediate image
-ADD . /app
-
-# Sync the project
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-editable
-
-FROM python:3.12-slim
-
-# Copy the environment, but not the source code
-COPY --from=builder --chown=app:app /app/.venv /app/.venv
-
-# Run the application
-CMD ["/app/.venv/bin/hello"]
+```sh
+cat <<delimiter
+  Body of the here doc
+  can be many lines...
+delimiter
 ```
 
-<!--NOTE: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers-->
+- Where `delimiter` can be basically anything with common choice being `EOF` for "end of file" or sometimes `!` because its easy to type.
+- `cat` is just an example command that can do something with `stdin` which is where the body of the here-document is sent
+- You could use other commands that know how to process `stdin`
 
-```dockerfile
-RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
-    uv sync
-```
-
-### COPY vs ADD
 ---
 
-## Heredocs
+## Heredocs: Example
+
+Often used to create files like:
+
+Basic syntax (type this in your shell right now):
+
+```sh
+cat <<EOF > example.sh
+echo "running ls"
+ls
+echo "done"
+EOF
+```
+
+Now, check the contents of `example.sh`
+
+```sh
+cat example.sh
+```
+
+For more details on syntax and what here-documents can do see https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html#tag_18_07_04
+
+---
+
+## Heredocs in Docker: `COPY`
+
+- Supported for some commands (`COPY`, `RUN`)
+- Saves you from maintaining separate files which can increase maintenance burden and complexity
+
+Inline a file so you dont need to make a separate file and copy it in:
+
+```dockerfile
+COPY <<EOF example.txt
+This is a really important file to have.
+It spans a few lines,
+but is quite short...
+So I decided to inline it with a heredoc
+EOF
+```
+
+---
+
+## Heredocs in Docker: `RUN`
+
+Use it to run a multi-line command without escaping every newline:
 
 ```dockerfile
 RUN <<EOF
-source $HOME/.bashrc && \
+source $HOME/.bashrc
 echo $HOME
+EOF
+```
+
+Even supports shebang headers:
+
+```dockerfile
+RUN <<EOF
+#!/usr/bin/env python
+print("hello world")
 EOF
 ```
 
@@ -74,8 +106,30 @@ https://docs.docker.com/reference/dockerfile/#here-documents
 
 ---
 
-## HEALTHCHECK
-## ONBUILD
+## Heredocs in Docker: inline builds
+
+My favorite fun-fact/feature for quickly building images!
+
+```sh
+docker build -t heredoc-build-example -<<!
+FROM alpine:latest
+# ...
+CMD ["/bin/sh"]
+!
+```
+
+---
+
+## Inspecting images
+
+
+```dockerfile
+docker history docker-demo
+```
+
+```dockerfile
+docker inspect docker-demo
+```
 
 ---
 
@@ -88,7 +142,30 @@ layout: section
 # Advanced
 
 ---
+
+## Bake
+
+TODO
+
+```hcl
+group "default" {
+  targets = ["app"]
+}
+
+target "app" {
+  dockerfile = "Dockerfile"
+  tags = ["myapp:latest"]
+  platforms = ["linux/amd64", "linux/arm64"]
+  context = "."
+}
+```
+
+<!-- explain and have a run command -->
+
+---
+
 ## Under the hood
 
 - 2008 linux introduces cgroups
-- Namespaces and unsharing 
+- Namespaces and unsharing
+- ...

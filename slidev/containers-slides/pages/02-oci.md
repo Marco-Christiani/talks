@@ -3,7 +3,7 @@ layout: section
 transition: slide-left
 ---
 
-# Lesson 2: OCI Standards & Tools
+# OCI Standards & Tools
 
 ---
 
@@ -13,6 +13,8 @@ transition: slide-left
 - Why should I care?
 	- Concepts we discuss are basically universal
 	- Hear the basic concepts and the tools make sense. Use the tools on their own and it's just esoteric magic.
+
+<v-click>
 
 ## Key Specifications
 
@@ -27,9 +29,11 @@ transition: slide-left
 A few implementations exist but they all arrive at (for our purposes) the same product
 </div>
 
+</v-click>
+
 ---
 
-## Flavors of Containerization
+# Flavors of Containerization
 
 <div class="grid grid-cols-2 gap-4">
 
@@ -59,4 +63,4 @@ A few implementations exist but they all arrive at (for our purposes) the same p
 docker run ubuntu
 podman run ubuntu
 apptainer run docker://ubuntu
-``` 
+```

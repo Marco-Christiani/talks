@@ -2,65 +2,11 @@
 layout: section
 ---
 
-# Lesson 4: Essential Docker Commands
+# Persisting data
 
 ---
 
-## Essential Docker run flags
-<!--Runtime configuration-->
-
-Just the most useful ones to know (typically abbreviated by first letter):
-- Interact with a shell: `-it` (accept stdin, allocate tty)
-- Expose a port: `--port 8000:9000`
-- Pass an environment variable: `--env FOO=bar`
-- Name: `--name`
-- Remove: `--rm`
-- Detach: `--detach`
-- Persisting data with mounts...
-  - Mount a file/directory:
-    - `--volume /path/on/host/:/path/in/container`
-    - With options: `-v /thing:/thing,ro`
-
----
-
-
-## Interact
-
-```bash
-docker run -it ubuntu
-```
-
-## Port Mapping
-
-```bash
-docker run --port 8000:9000
-# or
-docker run -p 8000:9000
-```
-
-## Environment Variables
-
-```bash
-docker run --env FOO=bar
-# or
-docker run -e FOO=bar
-```
-
-## Detach
-
-```bash
-docker run nginx # starts in foreground
-docker run -d nginx # starts in background, prints container id
-
-# Use the Docker CLI to see if its running and check the logs
-docker container ls # you can see how --name is useful
-docker logs container_name_or_id # Check output
-docker logs -f container_name_or_id # Follow output
-```
-
----
-
-## Persisting data
+# Mounts and Volumes
 
 1. mounts: Allow container access to a folder
 2. volumes: Give it a kind of virtual disk managed by docker somewhere else
@@ -104,7 +50,7 @@ docker run -v mydata:/container/path
 ```
 
 </div>
-</div> 
+</div>
 
 <!--SPEAKER-NOTE
 If you want to ensure that data generated or modified inside the container persists even after the container stops running, you would opt for a volume. See Persisting container data to learn more about volumes and their use cases.
@@ -118,10 +64,10 @@ https://docs.docker.com/get-started/docker-concepts/running-containers/persistin
 
 ### `--mount`
 
-Source: https://docs.docker.com/engine/storage/bind-mounts/
 > In general, --mount is preferred. Compared to --volume, --mount flag is more explicit and supports all the available options.
 >
 > If you use --volume to bind-mount a file or directory that does not yet exist on the Docker host, Docker automatically creates the directory on the host for you. If you use --mount, it will error.
+> https://docs.docker.com/engine/storage/bind-mounts/
 
 
 Valid options for --mount type=bind include:
@@ -132,3 +78,127 @@ Valid options for --mount type=bind include:
 | destination, dst, target | The path where the file or directory is mounted in the container. Must be an absolute path.  |
 | readonly, ro             | If present, causes the bind mount to be mounted into the container as read-only.             |
 | bind-propagation         | If present, changes the bind propagation.                                                    |
+
+---
+layout: section
+---
+
+# Intermediate concepts
+
+---
+
+
+## Multi-Stage Final Dockerfile
+
+```dockerfile {3-5|7-9|13-15}
+FROM python:3.12-slim AS builder
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install -r requirements.txt
+
+FROM python:3.12-slim
+COPY --from=builder /install /usr/local
+COPY app.py .
+CMD ["python3", "app.py"]
+```
+
+Compare the cache behavior and image size to an equivalent single-stage build.
+
+---
+
+## More on Mount Types
+
+```dockerfile {5}
+FROM python:3.12-slim
+RUN --mount=type=tmpfs,target=/tmpdata \
+    sh -c "echo 'temp' > /tmpdata/file && cat /tmpdata/file"
+```
+
+```dockerfile {4-6|7-9}
+FROM alpine
+RUN --mount=type=secret,id=mysecret \
+    cat /run/secrets/mysecret
+RUN --mount=type=ssh \
+    ssh -T git@github.com || true
+```
+
+(You may not be able to try out the ssh mount in your development environment right now.)
+
+---
+
+
+## Healthchecks
+
+Very useful feature for availability.
+
+```dockerfile {2-4|6-7}
+FROM python:3.12-slim
+HEALTHCHECK CMD curl --fail http://localhost || exit 1
+```
+
+---
+
+## Authoring Images - Metadata
+
+```dockerfile
+FROM alpine:latest
+
+LABEL maintainer="you@example.com"
+LABEL org.opencontainers.image.title="My App"
+LABEL org.opencontainers.image.description="A small example application."
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.source="https://github.com/your/repo"
+LABEL org.opencontainers.image.authors="Your Name <you@example.com>"
+
+# ...
+```
+
+---
+
+## Sharing Images (for everyone else)
+*Past machine boundaries
+
+```bash
+docker login
+docker push ...
+docker pull ...
+```
+
+---
+
+## Sharing Images (for us)
+
+*Past machine boundaries
+
+```bash
+docker save myapp | gzip > myapp.tar.gz
+docker load < myapp.tar.gz
+docker export container_id > rootfs.tar
+```
+
+
+---
+
+## ONBUILD
+
+- Executes immediately after `FROM` in a downstream build.
+- Niche but can be quite valuable
+
+
+```bash
+ONBUILD RUN echo foo
+```
+
+Challenge: See if you can test `ONBUILD` yourself.
+
+
+---
+
+# Common confusions, cleared up?
+
+- What problems does cache solve? What problems does cache create?
+- What did COPY vs ADD show?
+- When should we mount vs copy?
+- What are multi stage builds good for?
+- What is a layer?

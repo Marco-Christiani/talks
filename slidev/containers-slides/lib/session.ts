@@ -52,7 +52,7 @@ export const BACKEND_CONFIG = {
   }
 };
 
-// Active configuration based on environment
+// Active config based on env
 const activeConfig = isDevelopment ? BACKEND_CONFIG.development : BACKEND_CONFIG.production;
 
 export const BACKEND_HOST = activeConfig.host;
@@ -238,7 +238,7 @@ export function useSessionActions() {
   };
 }
 
-// WebSocket utilities
+// WS utils
 export function useWebSocket() {
   const createWebSocket = (sessionId: string, path: string = '/ws'): WebSocket => {
     // Add cache busting for development

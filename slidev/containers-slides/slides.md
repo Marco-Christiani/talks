@@ -18,19 +18,104 @@ addons:
   - tldraw
 layout: cover
 hideInToc: true
+
+# When building dist/assets/monaco is 7.5M
+# The largest file is dist/assets/monaco/bundled-types-DA6aMCyR.js is 2MB
+# Also, I see languages being bundles that I clearly do not use
+#  e.g., dist/assets/monaco/php-CpIb_Oan.js while those js files are small
+#  there is a file for seemingly every language monaco supports and it points
+#  to a problem with monaco bundling.
+#
+# From the docs:
+# "You can optionally switch to load types from CDN by setting the following headmatter
+# This feature is powered by @typescript/ata and runs completely on the client-side."
+# https://sli.dev/custom/config-monaco#auto-type-acquisition
+#
+# However, this seems to make no difference.
+# monacoTypesSource: ata
 ---
 
-# A header
+
+# Containerization
+
+TLDR; Containers, Images, and being productive.
+
+---
+hideInToc: true
+---
+
+# Table of Contents
+
+<Toc maxDepth="1" columns="2" />
+
+---
+src: pages/01-intro.md
+---
+
+---
+src: pages/02-oci.md
+---
+
+---
+src: pages/03-0-img-containers.md
+---
+
+---
+src: pages/03-1-building.md
+---
+
+---
+src: pages/03-2-flags-mounts.md
+---
+
+---
+src: pages/04-0-building.md
+---
+
+---
+src: pages/04-1-intermediate.md
+---
+
+---
+src: pages/05-mgmt-eco.md
+---
+
+---
+src: pages/06-end-to-end.md
+---
+
+---
+src: pages/07-advanced.md
+---
+
+<!-- --- -->
+<!-- layout: center -->
+<!-- class: text-center -->
+<!-- --- -->
+<!---->
+<!-- # References -->
+<!---->
+<!-- [Documentation](https://docs.docker.com/) · [GitHub](https://github.com/docker) · [Docker Hub](https://hub.docker.com/) -->
+<!---->
+<!-- <div class="pt-12"> -->
+<!--   <span class="px-2 py-1"> -->
+<!--     Made with Slidev -->
+<!--   </span> -->
+<!-- </div> -->
 
 ---
 
-## Board
+# Board
 
-<tldraw class="inset-0 w-full h-full" doc="tldraw/doc-VB7EcrPHwsr6tgD6WPsJg.json"></tldraw>
+<tldraw class="inset-0 w-full h-full" doc="tldraw/doc-Gan_pT8nhnkhJSrLPb8V8.json"></tldraw>
+
+<!--
+Switch to this slide when i need to draw things
+-->
 
 ---
 
-# Welcome to your sandbox
+# Sandbox demo
 
 <div class="grid grid-cols-2 gap-4">
 
@@ -59,85 +144,8 @@ CMD ["python3", "app.py"]
 ```bash {monaco-run} {autorun:false}
 docker build -t myapp . && docker run myapp
 ```
-
-<!-- ```bash {monaco-run} {autorun:false, height: 'auto'} -->
-<!-- docker run hello-world -->
-<!-- docker run hello-world -->
-
 ---
 
-## New slide
+# Run demo
 
 <RunButton cmd="docker run hello-world" />
-
-<!-- src: pages/000-progressive-narrative.md -->
-
-<!-- # Containerization
-
-TLDR; Containers, Images, and being productive. -->
-
-<!-- --- -->
-<!-- hideInToc: true -->
-<!-- --- -->
-<!---->
-<!-- # Table of Contents -->
-<!---->
-<!-- <Toc maxDepth="2" columns="2" /> -->
-<!---->
-<!-- --- -->
-<!-- layout: full -->
-<!-- routeAlias: terminal -->
-<!-- hideInToc: true -->
-<!-- transition: fade -->
-<!-- --- -->
-<!---->
-<!-- <TerminalPanel /> -->
-<!-- <TerminalToggle /> -->
-<!---->
-<!---->
-<!-- --- -->
-<!-- src: pages/01-intro.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/02-oci.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/03-img-containers.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/03-1-building.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/04-flags-mounts.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/05-mgmt-eco.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/06-end-to-end.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- src: pages/07-advanced.md -->
-<!-- --- -->
-<!---->
-<!-- --- -->
-<!-- layout: center -->
-<!-- class: text-center -->
-<!-- --- -->
-<!---->
-<!-- # References -->
-<!---->
-<!-- [Documentation](https://docs.docker.com/) · [GitHub](https://github.com/docker) · [Docker Hub](https://hub.docker.com/) -->
-<!---->
-<!-- <div class="pt-12"> -->
-<!--   <span class="px-2 py-1"> -->
-<!--     Made with Slidev -->
-<!--   </span> -->
-<!-- </div> -->

@@ -43,14 +43,15 @@ watch(
   },
 );
 
-onMounted(() => {
-  if (props.show) initializeSession();
-  document.addEventListener("keydown", handleKeydown);
-});
+// Wait for a click instead
+// onMounted(() => {
+//   if (props.show) initializeSession();
+//   // document.addEventListener("keydown", handleKeydown);
+// });
 
 onUnmounted(() => {
   cleanup();
-  document.removeEventListener("keydown", handleKeydown);
+  // document.removeEventListener("keydown", handleKeydown);
 });
 
 async function initializeSession() {
@@ -225,9 +226,10 @@ function closePopup() {
   emit("close");
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === "Escape" && props.show) closePopup();
-}
+// tbh i cant stop spamming this in vim
+// function handleKeydown(event: KeyboardEvent) {
+//   if (event.key === "Escape" && props.show) closePopup();
+// }
 </script>
 
 <template>
