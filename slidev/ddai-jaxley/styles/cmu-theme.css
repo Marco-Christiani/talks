@@ -1,0 +1,108 @@
+/* CMU Theme for Slidev - Base variables and layout overrides */
+
+/* Full CMU palette */
+:root {
+  --cmu-carnegie-red: #C41230;
+  --cmu-iron-gray: #6D6E71;
+  --cmu-black: #000000;
+  --cmu-white: #FFFFFF;
+  --cmu-steel-gray: #E0E0E0;
+  --cmu-gold-thread: #FDB515;
+
+  --cmu-scots-rose: #EF3A47;
+  --cmu-green-thread: #009647;
+  --cmu-teal-thread: #008F91;
+  --cmu-blue-thread: #043673;
+  --cmu-highlands-sky-blue: #007BC0;
+
+  --cmu-machinery-tan: #BCB49E;
+  --cmu-brick-beige: #E4DAC4;
+  --cmu-hornbostel-teal: #1F4C4C;
+  --cmu-palladian-green: #719F94;
+  --cmu-weaver-blue: #182C4B;
+  --cmu-skibo-red: #941120;
+
+  /* Defaults (light) */
+  --cmu-primary: var(--cmu-carnegie-red);
+  --cmu-secondary: var(--cmu-iron-gray);
+  --cmu-text: var(--cmu-black);
+  --cmu-bg: var(--cmu-white);
+  --cmu-text-on-primary: #F2F2F2;
+}
+
+/* Match Slidev's light/dark class pattern */
+html.light {
+  --cmu-primary: var(--cmu-carnegie-red);
+  --cmu-secondary: var(--cmu-iron-gray);
+  --cmu-text: var(--cmu-black);
+  --cmu-bg: var(--cmu-white);
+  --cmu-text-on-primary: #F2F2F2;
+}
+
+html.dark {
+  --cmu-primary: var(--cmu-scots-rose);
+  --cmu-secondary: #C8C9C7;
+  --cmu-text: #F2F2F2;
+  --cmu-bg: #0F0F10;
+  --cmu-text-on-primary: #F2F2F2;
+}
+
+/* Slidev base layout colors */
+.slidev-layout {
+  color: var(--cmu-text) !important;
+}
+
+.slidev-layout:not(.cover) {
+  background-color: var(--cmu-bg) !important;
+}
+
+.slidev-layout.cover {
+  color: var(--cmu-text-on-primary) !important;
+}
+
+.slidev-layout h1 {
+  color: var(--cmu-primary) !important;
+  font-size: 2rem !important; /* 24pt */
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  margin: 0 0 0.6em !important;
+}
+
+.slidev-layout h2 {
+  color: var(--cmu-primary) !important;
+  font-size: 1.5rem !important; /* 18pt */
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  margin: 0.8em 0 0.5em !important;
+}
+
+.slidev-layout h3 {
+  color: var(--cmu-primary) !important;
+  font-size: 1.5rem !important; /* 18pt */
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  margin: 0.7em 0 0.4em !important;
+}
+
+.slidev-layout p,
+.slidev-layout li {
+  font-size: 1.167rem !important; /* 14pt */
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+}
+
+/* Nested list levels (ul/ol): subtle, smaller, professional */
+.slidev-layout ul ul > li,
+.slidev-layout ul ol > li,
+.slidev-layout ol ul > li,
+.slidev-layout ol ol > li {
+  font-size: 1.05rem !important;
+  color: var(--cmu-secondary) !important;
+}
+
+.slidev-layout ul ul > li::marker,
+.slidev-layout ul ol > li::marker,
+.slidev-layout ol ul > li::marker,
+.slidev-layout ol ol > li::marker {
+  color: var(--cmu-secondary) !important;
+}

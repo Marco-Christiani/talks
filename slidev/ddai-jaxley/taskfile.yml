@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: "3"
+
+dotenv:
+  - .env
+
+tasks:
+  default: bun dev --remote=$PW --tunnel
+  # https://RANDOM_PHRASE.trycloudflare.com/presenter?password=$PW
