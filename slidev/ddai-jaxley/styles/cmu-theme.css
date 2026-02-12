@@ -64,32 +64,40 @@ html.dark {
   color: var(--cmu-primary) !important;
   font-size: 2rem !important; /* 24pt */
   font-weight: 700 !important;
-  line-height: 1.1 !important;
-  margin: 0 0 0.6em !important;
+  line-height: 1.0 !important;
+  /* margin: 0 0 0.6em !important; */
 }
 
 .slidev-layout h2 {
   color: var(--cmu-primary) !important;
-  font-size: 1.5rem !important; /* 18pt */
+  /* font-size: 1.5rem !important; */ /* 18pt */
+  font-size: 1.3rem !important;
   font-weight: 700 !important;
-  line-height: 1.15 !important;
-  margin: 0.8em 0 0.5em !important;
+  line-height: 1.1 !important;
+  /* margin: 0.8em 0 0.5em !important; */
 }
 
 .slidev-layout h3 {
   color: var(--cmu-primary) !important;
-  font-size: 1.5rem !important; /* 18pt */
+  /* font-size: 1.5rem !important; */ /* 18pt */
+  font-size: 1.2rem !important;
   font-weight: 700 !important;
-  line-height: 1.2 !important;
-  margin: 0.7em 0 0.4em !important;
+  line-height: 1.15 !important;
+  /* margin: 0.7em 0 0.4em !important; */
+  margin: 0.8em 0 0.0em !important;
 }
 
 .slidev-layout p,
 .slidev-layout li {
   font-size: 1.167rem !important; /* 14pt */
   font-weight: 400 !important;
-  line-height: 1.25 !important;
+  line-height: 1.2 !important;
 }
+
+.slidev-layout p {
+  margin: 0.3em 0 0.5em !important;
+}
+
 
 /* Nested list levels (ul/ol): subtle, smaller, professional */
 .slidev-layout ul ul > li,
@@ -105,4 +113,9 @@ html.dark {
 .slidev-layout ol ul > li::marker,
 .slidev-layout ol ol > li::marker {
   color: var(--cmu-secondary) !important;
+}
+
+figcaption {
+  font-size: .7em;
+  font-style: italic;
 }

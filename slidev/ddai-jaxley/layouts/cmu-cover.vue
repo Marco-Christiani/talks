@@ -9,7 +9,7 @@
       " />
 
     <!-- Main content -->
-    <div class="relative mx-auto max-w-4xl pt-28 text-left">
+    <div class="relative mx-30 max-w-4xl pt-28 text-left">
 
       <!-- Institution -->
       <!-- <div class="text-lg font-serif mb-12">
