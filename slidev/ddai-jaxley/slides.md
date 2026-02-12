@@ -125,15 +125,14 @@ Each evaluation of $\hat{x}(\theta)$ requires **solving a system of ODEs**.  Exi
 
 $$\theta \;\longrightarrow\; \boxed{\text{ODE solver}} \;\longrightarrow\; \hat{x}(\theta)$$
 
-<!-- **Finite differences** cost $p + 1$ simulations per gradient. **Backprop** costs ~1 fwd + 1 bwd, irr of $p$. -->
-
 | Method | Cost per gradient | At $p = 100{,}000$ |
 |---|---|---|
 | Finite differences | $(p + 1) \times$ forward sim | ~100,001 simulations |
-| Backpropagation | ~1 forward + 1 backward | ~2 sim-equivalents |
+| Backpropagation | ~1 forward + 1 backward | ~4-21x forward sim |
 
 <!--
-- Finite differences: $\frac{\partial \mathcal{L}}{\partial \theta_i} \approx \frac{\mathcal{L}(\theta + \epsilon e_i) - \mathcal{L}(\theta)}{\epsilon}$
+**Finite differences** cost $p + 1$ simulations per gradient. **Backprop** costs ~1 fwd + 1 bwd, irr of $p$.
+-  $\frac{\partial \mathcal{L}}{\partial \theta_i} \approx \frac{\mathcal{L}(\theta + \epsilon e_i) - \mathcal{L}(\theta)}{\epsilon}$
 - Backprop cost is 3-20x forward sim depending on settings, but independent of parameter count
 - Example: 2,000-neuron network, 3.2M parameters - finite differences >2 years, backprop 144 seconds
 - Key takeaway: if we can differentiate through the ODE solver, we unlock backprop. That's what Jaxley does.
@@ -192,9 +191,9 @@ layout: default
 
 ---
 
-# Training Stabilization
+# Addressing instability of biophysical model training
 <nbsp />
-<!-- These are not standard off-the-shelf — the authors developed or adapted them for the specific challenges of biophysical model training. -->
+<!-- These are not standard off-the-shelf - the authors developed or adapted them for the specific challenges of biophysical model training. -->
 
 <v-click>
 
@@ -642,15 +641,18 @@ Extending the paper's evidence-integration RNN
 
 Take the trained biophysical RNN -- 20 conductance-based biophysical neurons (multi-channel ion dynamics, conductance-based synapses) + 2 readout cells. **Freeze all network parameters.**
 
-Train a small **stimulation policy** $\pi_\phi$: at each timestep, observes readout voltages + normalized time, outputs a scalar gain $g_t$ that scales the injected stimulus current across all cells.
+Train a small **stimulation policy** $\pi_\phi$: at each timestep, observes readout voltages + normalized time, outputs a scalar gain $g_t$ that scales the stimulus injected in the input compartment (basal branch).
 
-$$I_i(t) \propto g_t \cdot s(t) \cdot w_i, \quad g_t = \pi_\phi(v_{\text{readout}}(t),\; t/T)$$
+$$I_i(t) \propto g_t \cdot s(t) \cdot w_i, \quad g_t = \pi_\phi(v_{\text{readout}}(t),\; t/T) $$
 
 where $s(t)$ is the evidence waveform and $w_i$ are fixed per-cell input weights.
 
 **Objective:** task performance + stimulation efficiency
 
-$$\mathcal{L} = \mathcal{L}_{\text{CE}}(\text{readout},\; \text{label}) + \lambda \sum_t g_t^2$$
+<!-- $$\mathcal{L} = \mathcal{L}_{\text{CE}}(\text{readout},\; \text{label}) + \lambda \sum_t g_t^2$$ -->
+$$
+\mathcal{L}=\mathcal{L}_{CE}+\lambda_g\sum_t g_t^2+\lambda_I\sum_t \Big(\tfrac{1}{N}\sum_i I_i(t)^2\Big)
+$$
 
 Trained end-to-end with BPTT through the full biophysical simulation.
 
@@ -660,11 +662,18 @@ Trained end-to-end with BPTT through the full biophysical simulation.
 - Policy: observes 2 readout voltages + normalized time → scalar gain. Very few parameters.
 - The reported policy was trained with --cost gain --lambda-u 0.1 (gain energy penalty). We also trained with --cost current --lambda-u 5000 and got similar behavior.
 - Table reports mean injected-current power at eval time (measured quantity), even though training penalized gain magnitude. Both decrease together since I ∝ g.
+- $i$ corresponds to cell $i$ (currently we dont have policy weights per cell, just a scalar)
 - "Model-based deterministic policy optimization" -- differentiable simulator IS the environment model.
 - 100% on 200 trials consistent with authors' 0.999 accuracy under same trial generator.
 - Key advantage over RL: exact, low-variance gradients. No REINFORCE needed.
 - Limitation: 500ms horizon. Longer protocols face same timescale challenges from paper's discussion.
 - Extensions: multi-electrode policies, state-dependent waveform shaping, uncertainty-aware control.
+
+- Policy model - tiny 2-layer MLP mapping 3 inputs → 1 gain.
+  - input x_t = [v_readout0(t), v_readout1(t), t/T] (3 scalars)
+  - hidden: 16 tanh units
+  - output: 1 scalar logit
+  - gain: g_t = sigmoid(logit) * g_max
 -->
 
 ---
@@ -674,7 +683,7 @@ Trained end-to-end with BPTT through the full biophysical simulation.
 Results
 <center>
 <figure>
-  <img src="/assets/my_policy_fig.png" class="w-100 pt-5 pb-1" caption="custom policy" />
+  <img src="/assets/my_policy_fig.png" class="w-110 pt-0 pb-1" caption="custom policy" />
   <figcaption>
   Two example trials under the learned policy. Top: noisy evidence stimulus 
 (negative mean = label 0, positive = label 1). Middle: policy gain gt learned 
@@ -686,11 +695,8 @@ voltages separate correctly by the response window (gray).
 </center>
 
 <style>
-  table {
-    padding-top: 0.2em !important;
-    padding-bottom: 0.2em !important;
-  }
   th {
+    font-weight: 600;
     font-size: 1.0em;
     padding-top: 0.2em !important;
     padding-bottom: 0.2em !important;
@@ -699,15 +705,18 @@ voltages separate correctly by the response window (gray).
     font-size: 0.6em;
   }
   td {
-    padding-top: 0.2em !important;
-    padding-bottom: 0.2em !important;
+    padding-top: 0.5em !important;
+    padding-bottom: 0.5em !important;
   }
 </style>
+
+<div class="mx-auto w-65% mt-2">
 
 | | Accuracy | Mean current power |
 |---|---|---|
 | Fixed baseline ($g=1$) | 99.9% | $1.57 \times 10^{-5}$ |
 | Learned policy | **100%** (200 trials) | $4.83 \times 10^{-7}$ (**~30× reduction**) |
+</div>
 
 <!-- *Task performance preserved while substantially reducing stimulation effort.* -->
 
@@ -736,53 +745,73 @@ layout: section
 
 ---
 
-# Vector-Jacobian products
-
+# Vector-Jacobian Products
 <nbsp />
+The full computation is a chain:
 
-Given a function $f: \mathbb{R}^n \to \mathbb{R}^m$ with Jacobian $J \in \mathbb{R}^{m \times n}$, the VJP computes:
+$$\theta \;\xrightarrow{\;f\;}\; \hat{x}(\theta) \;\xrightarrow{\;\mathcal{L}\;}\; \text{scalar}$$
 
-$v^\top J \quad \text{for a given vector } v \in \mathbb{R}^m$
+By the chain rule:
 
-When $m = 1$ (scalar loss), this gives the **full gradient** $\nabla_\theta \mathcal{L} \in \mathbb{R}^n$ in one backward pass, regardless of $n$.
+$$\nabla_\theta \mathcal{L} = J_f^\top \; \nabla_{\hat{x}} \mathcal{L}$$
+
+The VJP computes $v^\top J$ for a given $v \in \mathbb{R}^m$ — **without forming $J$**.
+
+Setting $v = \nabla_{\hat{x}} \mathcal{L}$ gives the full gradient $\nabla_\theta \mathcal{L} \in \mathbb{R}^n$ in one backward pass, regardless of $n$.
 
 - **Cost:** $O(1)$ backward passes for the full gradient
-- **Memory:** must store intermediate states (the "tape") from the forward pass -- hence checkpointing
+- **Memory:** must store intermediate states (the "tape") — hence checkpointing
 
-<br>
-<br>
 <v-click>
-<center><em>This is reverse-mode autodiff</em></center>
+<center><em>This is reverse-mode autodiff.</em></center>
 </v-click>
+
+<!--
+- $J_f$ is Jacobian of simulator (m outputs x n parameters) -- big, never materialized
+- $\nabla_{\hat x} L$ is cheap to compute (gradient of loss w.r.t. its input, e.g. just the residual for MSE)
+- The VJP propagates this vector backward through each layer of the computation without forming $J$
+- For Jaxley: $f$ is the ODE solver, $\theta$ includes all conductances/synaptic weights, $\hat x$ is the voltage trace
+- Cost is O(1) in n because you're doing one backward pass regardless of how many parameters exist
+- Memory: for an ODE solve with T timesteps, naive backprop stores all T intermediate states. Checkpointing trades recomputation for memory.
+-->
 
 ---
 
-# Jacobian-vector products
-
+# Jacobian-Vector Products
 <nbsp />
 
 Given a function $f: \mathbb{R}^n \to \mathbb{R}^m$ with Jacobian $J \in \mathbb{R}^{m \times n}$, the JVP computes:
 
-$J v \text{ for a given vector } v \in \mathbb{R}^n$
+$$J v \text{ for a given vector } v \in \mathbb{R}^n$$
 
-This propagates a **tangent vector** (a directional derivative) forward through the computation alongside the primal values.
+This propagates a **tangent vector** (directional derivative) forward alongside the primal computation.
 
-- **Cost:** $O(1)$ per tangent direction, but need $n$ passes for the full Jacobian
-- **Memory:** no tape needed -- only current state plus tangent
-- **Strength:** when you need derivatives w.r.t. a few inputs (not many parameters), or when you need Jacobian-vector products directly
+- **Cost:** $O(1)$ per tangent direction, but need $n$ passes for full Jacobian
+- **Memory:** no tape needed — only current state plus tangent
+- **When it wins over VJP:** few input directions, many outputs, or when you need $Jv$ directly
 
 <v-click>
 
-<br>
 <center><em>This is forward-mode autodiff</em></center>
-<br>
 
 </v-click>
 
 <v-click>
 
-> **In the paper:** Computing Lyapunov exponents for the biophysical RNN (Fig. 4c). The algorithm requires iterating $q_{t+1} = \frac{Df|_{x_t} \, q_t}{\|Df|_{x_t} \, q_t\|}$ -- a Jacobian-vector product at every time step. Forward mode computes this naturally without storing the full trajectory.
+> **In the paper:** Lyapunov exponents (Fig. 4c) require iterating $q_{t+1} = \frac{Df|_{x_t} \, q_t}{\|Df|_{x_t} \, q_t\|}$ — a JVP at every timestep. Forward mode computes this naturally without storing the full trajectory.
+
 </v-click>
+
+<!--
+- VJP (previous slide): efficient when few outputs, many params → training
+- JVP: efficient when few input directions, many outputs → analysis
+- Lyapunov exponent measures sensitivity to initial conditions (positive = chaotic, negative = stable)
+- The algorithm: propagate a perturbation vector forward, renormalize at each step, measure growth rate
+- $Df|_{x_t}$ is the Jacobian of one solver step evaluated at state $x_t$
+- JAX makes this trivial: `jax.jvp(step_fn, (x_t,), (q_t,))` gives both f$(x_t)$ and $Df·q_t$ in one call
+- You could also compute Lyapunov exponents with VJP but you'd need to store the full forward trajectory — JVP avoids this entirely
+- This is an example of differentiable simulation enabling analysis, not just training
+-->
 
 ---
 
@@ -790,7 +819,8 @@ This propagates a **tangent vector** (a directional derivative) forward through 
 <nbsp />
 JAX's `jit` system compiles Python functions to optimized XLA (Accelerated Linear Algebra) kernels.
 
-- For Jaxley, this means the entire ODE solver (i.e., tridiagonal solve for implicit Euler at every time step) can be lowered to GPU- and TPU-native code.
+- For Jaxley, this means the entire ODE solver can be lowered to GPU- and TPU-native code.
+  - I.e., tridiagonal solve for implicit Euler at every time step
 
 **Structured control flow:**
 - The ODE solver must iterate sequentially through thousands of time steps. A naive loop would:
@@ -798,11 +828,11 @@ JAX's `jit` system compiles Python functions to optimized XLA (Accelerated Linea
   - break the computation graph (often cannot autodiff a loop)
 
 <!--
- This is why Jaxley can JIT-compile the entire simulation + backprop pipeline -- there are no Python-level loops to break the trace.
+This is why Jaxley can JIT-compile the entire simulation + backprop pipeline -- there are no Python-level loops to break the trace.
 VJP is efficient when you have many parameters and one scalar output (training) -- backprop.
 JVP is efficient when you have few input directions and many outputs (analysis) -- Lyapunov exponents, sensitivity analysis, and optimal experiment design.
 JAX gives you both through the same interface, which is why Jaxley can serve both training and analysis use cases.
-The `scan` point is important for anyone who's tried to write differentiable ODE solvers in PyTorch — dynamic control flow makes this much harder there. JAX's functional design and XLA compilation make the ODE solver a first-class differentiable program. 
+The `scan` point is important for anyone who's tried to write differentiable ODE solvers in PyTorch — dynamic control flow makes this much harder there. JAX's functional design and XLA compilation make the ODE solver a first-class differentiable program.
 -->
 
 ---
