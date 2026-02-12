@@ -4,6 +4,7 @@ export default defineConfig({
   server: {
     allowedHosts: [
       ".trycloudflare.com",
+      "slides.datatician.io",
     ],
   },
 })

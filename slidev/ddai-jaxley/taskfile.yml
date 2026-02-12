@@ -5,5 +5,22 @@ dotenv:
   - .env
 
 tasks:
-  default: bun dev --remote=$PW --tunnel
+  default:
+    cmds:
+      - bun dev --remote=$PW
+      # - bun dev --remote=$PW --tunnel
+  # prod-up:
+  #   cmds:
+  #     - bun run build
+  #     - bun serve --port 3030 dist
   # https://RANDOM_PHRASE.trycloudflare.com/presenter?password=$PW
+  setup-tunnel:
+    cmds:
+      # Create tunnel
+      - cloudflared tunnel create slidev
+      # Create dns record
+      - cloudflared tunnel route dns slidev slides.datatician.io
+      # (Allow the origin in vite config)
+  start-tunnel:
+    cmds:
+      - cloudflared tunnel --url http://localhost:3030 run slidev
